@@ -1,0 +1,9 @@
+#!/bin/sh
+
+if [ ! -d $HOME/.bashkit/ ]; then echo 'Install `~/.bashkit/`'; git clone git@github.com:RubaXa/bashkit.git $HOME/.bashkit; fi
+source "$HOME/.bashkit/all.sh";
+
+logInfo "Run pre-commit hook:";
+npm test
+npm run build
+git add .

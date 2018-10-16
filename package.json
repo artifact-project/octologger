@@ -1,0 +1,51 @@
+{
+  "name": "octologger",
+  "version": "0.1.0",
+  "description": "Scaffold for Artifact project",
+  "author": "RubaXa <trash@rubaxa.org>",
+  "license": "MIT",
+  "repository": "git@github.com:artifact-project/octologger.git",
+  "main": "index.js",
+  "scripts": {
+    "test": "jest --coverage",
+    "ts-build": "tsc",
+    "git-clean": "git clean -f",
+    "installHooks": "cp ./.hooks/git/* ./.git/hooks/",
+    "postinstall": "npm run installHooks && npm run build",
+    "prepublishOnly": "npm run test && npm run ts-build",
+    "postpublish": "npm run git-clean",
+    "dev-build": "NODE_ENV=dev rollup --config",
+    "prod-build": "NODE_ENV=production rollup --config",
+    "build": "npm run dev-build && npm run prod-build && npm run git-clean"
+  },
+  "files": [
+    "*.js",
+    "*.d.ts",
+    "src/*/*.js",
+    "src/*/*.d.ts"
+  ],
+  "devDependencies": {
+    "@types/jest": "^19.2.3",
+    "jest": "^20.0.3",
+    "rollup": "^0.64.1",
+    "rollup-plugin-replace": "^2.0.0",
+    "rollup-plugin-typescript2": "^0.16.1",
+    "rollup-plugin-uglify": "^4.0.0",
+    "ts-jest": "^20.0.4",
+    "typescript": "2.6.2"
+  },
+  "jest": {
+    "transform": {
+      "^.+\\.tsx?$": "<rootDir>/node_modules/ts-jest/preprocessor.js"
+    },
+    "testRegex": "\\.tests\\.ts$",
+    "transformIgnorePatterns": [],
+    "setupTestFrameworkScriptFile": "<rootDir>/__jest__/extensions.ts",
+    "moduleFileExtensions": [
+      "ts",
+      "tsx",
+      "js",
+      "json"
+    ]
+  }
+}
