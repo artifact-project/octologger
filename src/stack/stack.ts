@@ -50,7 +50,7 @@ export function parseStackRow(value: string): StackRow {
 	return null;
 }
 
-export function parseStack(stack: string) {
+export function parseStack(stack: string): StackRow[] {
 	if (stack == null) {
 		return null;
 	}

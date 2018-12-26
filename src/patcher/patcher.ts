@@ -1,7 +1,8 @@
-import { startTask, cancelTask } from '../task/task';
+import { globalThis } from '../utils/utils';
+import { createTimerTask, cancelTimerTask } from '../task/timers';
+import { getLoggerContext } from '../logger/logger';
 
-const globals: Window = Function('return this')();
-const original: Partial<Window> = {};
+const nativeAPI: Partial<Window> = {};
 
 const timersList = [
 	'Timeout',
@@ -10,72 +11,89 @@ const timersList = [
 	'AnimationFrame',
 ];
 
-timersList.forEach(name => {
-	const isRAF = name === 'AnimationFrame';
-	const setName = `${isRAF ? 'request' : 'set'}${name}`;
-	const cancelName = `${isRAF ? 'cancel' : 'clear'}${name}`;
+function eachTimers(
+	scope: Partial<Window>,
+	iterator: (
+		isRAF: boolean,
+		setName: string,
+		setFn: Function,
+		cancelName: string,
+		cancelFn: (pid: number) => void,
+	) => void,
+) {
+	timersList.forEach(name => {
+		const isRAF = name === 'AnimationFrame';
+		const setName = `${isRAF ? 'request' : 'set'}${name}`;
+		const cancelName = `${isRAF ? 'cancel' : 'clear'}${name}`;
 
-	original[setName] = globals[setName];
-	original[cancelName] = globals[cancelName];
+		iterator(isRAF, setName, scope[setName], cancelName, scope[cancelName]);
+	});
+}
+
+// Save origins
+eachTimers(globalThis, (_, setName, setFn, cancelName, cancelFn) => {
+	nativeAPI[setName] = setFn;
+	nativeAPI[cancelName] = cancelFn;
 });
 
 function patchTimer(
-	globals: Window,
+	scope: Window,
 	isRAF: boolean,
-	setName: string,
-	setFn: Function,
+	createName: string,
+	nativeCreate: Function,
 	cancelName: string,
-	cancelFn: (pid: number) => void,
+	nativeCancel: (pid: number) => void,
 ) {
-	if (isRAF) {
-		globals[setName] = function (callback: Function) {
-			const task = startTask(setName, cancelFn, setFn((timestamp: number) => {
-				try {
-					callback(timestamp);
-				} catch (err) {
-					task.end(err);
-				} finally {
-					task.end();
-				}
-			}));
+	scope[createName] = function (callback: Function, delay: number = 0, ...params: any[]) {
+		const ctx = getLoggerContext();
 
-			return task.pid;
-		};
-	} else {
-		globals[setName] = function (callback: Function, delay: number, ...params: any[]) {
-			const task = startTask(setName, cancelFn, setFn(() => {
-				try {
-					if (!callback.length || !params.length) {
-						callback();
-					} else {
-						switch (params.length) {
-							case 1: callback(params[0]); break;
-							case 2: callback(params[0], params[1]); break;
-							case 3: callback(params[0], params[1], params[2]); break;
-							case 4: callback(params[0], params[1], params[2], params[3]); break;
-							case 5: callback(params[0], params[1], params[2], params[3], params[4]); break;
-							default: callback(...params); break;
-						}
-					}
-				} catch (err) {
-					task.end(err);
-				} finally {
-					task.end();
-				}
-			}, delay));
+		if (ctx === null) {
+			return isRAF
+				? nativeCreate(callback)
+				: nativeCreate(callback, delay, ...params)
+			;
+		}
 
-			return task.pid;
-		};
-	}
-
-	globals[cancelName] = function (pid: number) {
-		cancelTask(setName, pid);
+		return createTimerTask(
+			ctx,
+			createName,
+			delay,
+			callback,
+			nativeCreate,
+			isRAF,
+			params,
+		);
 	};
 
-	markAsNativeCode(globals, setName);
-	markAsNativeCode(globals, cancelName);
+	scope[cancelName] = function (pid: number) {
+		cancelTimerTask(
+			pid,
+			nativeCancel,
+		);
+	};
+
+	markAsNativeCode(scope, createName);
+	markAsNativeCode(scope, cancelName);
 }
 
-function markAsNativeCode(globals: Window, method: string) {
-	globals[method].toString = () => `function ${method}() { [native code] }`;
+export function patchTimers(scope: Window) {
+	eachTimers(nativeAPI, (isRAF, setName, setFn, cancelName, cancelFn) => {
+		if (scope[setName] === setFn) {
+			patchTimer(scope, isRAF, setName, setFn, cancelName, cancelFn);
+		}
+	});
+}
+
+export function revertPatchTimers(scope: Window) {
+	eachTimers(nativeAPI, (_, setName, setFn, cancelName, cancelFn) => {
+		scope[setName] = setFn;
+		scope[cancelName] = cancelFn;
+	});
+}
+
+function markAsNativeCode(scope: Window, method: string) {
+	scope[method].toString = function () {
+		return `function ${method}() { [native code] }`;
+	};
+	scope[method].native = nativeAPI[method];
 }

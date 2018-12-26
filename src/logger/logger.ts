@@ -1,28 +1,7 @@
 import { parseError } from '../error/error';
-import { Output, consoleOutput } from '../output/output';
+import { consoleOutput } from '../output/output';
 import { LogLevels } from './levels';
-import { Entry, EntryTypes } from './entry';
-
-export type CoreLogger = {
-	add(entry: Entry): Entry;
-	add(label: string, detail?: any): Entry;
-}
-
-export type LoggerAPI = {
-	[method:string]: (...args: any[]) => any;
-}
-
-export type LoggerOptions = {
-	meta: boolean;
-	storeLast: number;
-	output: Output[];
-}
-
-export type LoggerEnv = {
-	setup: (optionsPatch: Partial<LoggerOptions>) => void;
-	levels: typeof LogLevels;
-	logger: CoreLogger;
-}
+import { Entry, EntryTypes, ScopeEntry, LoggerOptions, LoggerAPI, LoggerEnv, Logger, EntryMeta, CoreLogger, LoggerContext, LoggerScope, LoggerScopeContext } from './logger.types';
 
 export function isLogEntry(x: any): x is Entry {
 	return x && x.hasOwnProperty('type') && x.hasOwnProperty('level');
@@ -34,6 +13,7 @@ export function createLogEntry(
 	label: Entry['label'],
 	message: Entry['message'],
 	detail: Entry['detail'],
+	meta: Entry['meta'] = null,
 ): Entry {
 	return {
 		type: EntryTypes.entry,
@@ -42,41 +22,16 @@ export function createLogEntry(
 		label,
 		message,
 		detail,
-		meta: null,
+		meta,
 		parent: null,
 		entries: [],
-	} as Entry;
+	};
 }
 
-export type ScopeExecutor<LA extends LoggerAPI, LS extends LoggerScope<LA>> = (scope: LS) => void;
-export type LoggerScope<LA extends LoggerAPI> = {
-	[K in keyof LA]: LA[K];
-} & {
-	scope(): Entry; // current scope
-
-	scope(
-		label: string,
-		executor: ScopeExecutor<LA, LoggerScope<LA>>,
-	): LoggerScope<LA>;
-
-	scope(
-		label: string,
-		detail: any,
-		executor: ScopeExecutor<LA, LoggerScope<LA>>,
-	): LoggerScope<LA>;
-}
-
-export type Logger<LA extends LoggerAPI> = LoggerScope<LA> & {
-	setup: LoggerEnv['setup'];
-	clear(): Entry[];
-	getEntries(): Entry[];
-	getLastEntry(): Entry;
-}
-
-export function getMeta(offset:number = 0): Entry['meta'] {
+export function getMeta(offset: number = 0): EntryMeta {
 	const stack = parseError(new Error).stack;
 
-	if (stack.length < offset) {
+	if (stack.length <= offset) {
 		return null;
 	}
 
@@ -88,10 +43,13 @@ export function getMeta(offset:number = 0): Entry['meta'] {
 	}
 }
 
-function createCoreLogger(options: LoggerOptions, parent: Entry) {
+function createCoreLogger(options: Partial<LoggerOptions>, ctx: LoggerScopeContext) {
 	return {
 		add(message: string | Entry, detail?: any): Entry {
+			const parent = ctx.parent;
 			let entry: Entry;
+
+			// console.log(ctx.parent.message);
 
 			if (isLogEntry(message)) {
 				entry = message;
@@ -105,12 +63,11 @@ function createCoreLogger(options: LoggerOptions, parent: Entry) {
 				);
 			}
 
-			if (options.meta) {
+			if (options.meta && entry.meta === null) {
 				entry.meta = getMeta(3);
 			}
 
-			entry.parent = parent;
-			const length = parent.entries.push(entry);
+			const length = (entry.parent = parent).entries.push(entry);
 
 			if (length > options.storeLast) {
 				parent.entries.splice(0, 1);
@@ -126,35 +83,87 @@ function createCoreLogger(options: LoggerOptions, parent: Entry) {
 	};
 }
 
-export function createLogger<LA extends LoggerAPI>(factory: (env: LoggerEnv) => LA) {
-	function createScopeEntry(label: string) {
-		return {
-			level: LogLevels.info,
-			type: EntryTypes.scope,
-			badge: null,
-			label,
-			parent: null,
-			message: null,
-			detail: {
-				args: null,
-				tasks: [],
-				pending: false,
-				passed: 0,
-				failed: 0,
-			},
-			meta: options.meta ? getMeta() : null,
-			entries: [],
-		}
+export function createScopeEntry(
+	level: Entry['level'],
+	badge: Entry['badge'],
+	label: Entry['label'],
+	message: Entry['message'],
+	detail: Entry['detail'],
+	meta: Entry['meta'] = null,
+): ScopeEntry {
+	return {
+		level: level,
+		type: EntryTypes.scope,
+		badge,
+		label,
+		parent: null,
+		message,
+		detail: {
+			info: detail,
+			state: null,
+		},
+		meta,
+		entries: [],
+	}
+}
+
+let _activeContext: LoggerContext<any> = null;
+
+export function getLoggerContext(): LoggerContext<any> {
+	return _activeContext;
+}
+
+export function switchLoggerContext(ctx: LoggerContext<any>, scope: LoggerScope<any>) {
+	if (ctx === null) {
+		_activeContext = null;
+		return;
 	}
 
-	const options: LoggerOptions = {
-		meta: false,
-		storeLast: 1e3,
-		output: [],
-	};
+	const prev_context = _activeContext;
+	const prev_scope = ctx.scope;
 
-	const root: Entry = createScopeEntry('#root');
-	const logger = createCoreLogger(options, root);
+	_activeContext = ctx;
+	ctx.scope = scope;
+
+	if (ctx.scopeContext) {
+		ctx.scopeContext.parent = scope.scope();
+	}
+
+	return {
+		context: prev_context,
+		scope: prev_scope,
+	};
+}
+
+export function revertLoggerContext(snapshot: {context: LoggerContext<any>, scope: LoggerScope<any>}) {
+	switchLoggerContext(snapshot.context, snapshot.scope);
+}
+
+export function createLogger<LA extends LoggerAPI>(
+	options: Partial<LoggerOptions>,
+	factory: (env: LoggerEnv) => LA,
+): Logger<LA> {
+	if (options.meta == null) {
+		options.meta = false;
+	}
+
+	if (options.storeLast == null) {
+		options.storeLast = 1e3;
+	}
+
+	if (options.output == null) {
+		options.output = [];
+	}
+
+	// todo: creation meta
+	const root = createScopeEntry(LogLevels.info, '🚧', '#root', null, null);
+	const _activeScopeContext: LoggerScopeContext = {
+		logger: null,
+		parent: root,
+	};
+	const logger = createCoreLogger(options, _activeScopeContext);
+
+	_activeScopeContext.logger = logger;
 
 	const setup = (optionsPatch: Partial<LoggerOptions>) => {
 		for (let key in optionsPatch) {
@@ -170,8 +179,7 @@ export function createLogger<LA extends LoggerAPI>(factory: (env: LoggerEnv) => 
 		logger,
 	});
 
-	let currentScope = root;
-
+	// Reserved methods
 	['clear', 'scope', 'setup', 'getEntries', 'getLastEntry'].forEach((name) => {
 		if (api.hasOwnProperty(name)) {
 			throw new SyntaxError(`[octologger] "${name}" is a reserved identifier`);
@@ -182,9 +190,9 @@ export function createLogger<LA extends LoggerAPI>(factory: (env: LoggerEnv) => 
 	api.setup = setup;
 	api.getEntries = () => root.entries;
 	api.getLastEntry = () => root.entries[root.entries.length - 1] || null;
-	api.scope = function scopeCreator(label: string, detail: any, executor?: Function) {
+	api.scope = function scopeCreator(message: string, detail: any, executor?: Function) {
 		if (arguments.length === 0) {
-			return currentScope;
+			return (this as any)._scopeEntry;
 		}
 
 		if (executor == null && typeof detail === 'function') {
@@ -192,21 +200,48 @@ export function createLogger<LA extends LoggerAPI>(factory: (env: LoggerEnv) => 
 			detail = null;
 		}
 
-		const scopeEntry = createScopeEntry(label);
+		const scopeEntry = isLogEntry(message) ? message : createScopeEntry(
+			LogLevels.info,
+			'↘️',
+			null,
+			message,
+			detail,
+			options.meta ? getMeta(2) : null,
+		);
+		_activeScopeContext.logger.add(scopeEntry);
+
+		const logger = createCoreLogger(options, {parent: scopeEntry});
 		const scopeAPI = factory({
 			setup,
 			levels: LogLevels,
-			logger: createCoreLogger(options, scopeEntry),
+			logger,
 		});
 
 		scopeAPI.scope = scopeCreator;
+		(scopeAPI as any)._scopeEntry = scopeEntry;
 
 		// Переключаем scope
 		if (typeof executor === 'function') {
-			let _currentScope = currentScope;
-			currentScope = scopeEntry;
+			const prev_activeContext = _activeContext;
+			const prev_parentEntry = _activeScopeContext.parent;
+			const prev_parentLogger = _activeScopeContext.logger;
+
+			_activeContext = {
+				entry: scopeEntry,
+				scope: scopeAPI as LoggerScope<LA>,
+				logger,
+				options,
+				scopeContext: _activeScopeContext
+			};
+
+			_activeScopeContext.parent = scopeEntry;
+
 			executor(scopeAPI);
-			currentScope = _currentScope; // возвращаем scope
+
+			_activeContext = prev_activeContext;
+
+			_activeScopeContext.parent = prev_parentEntry;
+			_activeScopeContext.logger = prev_parentLogger;
 		}
 
 		return scopeAPI;
@@ -215,25 +250,20 @@ export function createLogger<LA extends LoggerAPI>(factory: (env: LoggerEnv) => 
 	return api as Logger<LA>;
 }
 
-const octlogger = createLogger(({
-	setup,
+const octlogger = createLogger({
+	meta: true,
+	output: [consoleOutput()],
+}, ({
 	levels,
 	logger,
-}) => {
-	setup({
-		meta: true,
-		output: [consoleOutput()],
-	});
+}) => Object.keys(levels).reduce((api, level) => {
+	api[level] = (...args: any[]) => {
+		logger.add(createLogEntry(levels[level], null, null, null, args));
+	};
 
-	return Object.keys(levels).reduce((api, level) => {
-		api[level] = (...args: any[]) => {
-			logger.add(createLogEntry(levels[level], null, null, null, args));
-		};
-
-		return api;
-	}, {}) as {
-		[K in (keyof typeof levels)]: (...args: any[]) => void;
-	}
+	return api;
+}, {}) as {
+	[K in (keyof typeof levels)]: (...args: any[]) => void;
 });
 
 export {

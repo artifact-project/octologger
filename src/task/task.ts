@@ -1,49 +1,31 @@
-import { now } from '../utils/utils';
+import { LogLevels } from '../logger/levels';
 
-const tasks = {} as {
-	[index:string]: Task;
-};
+const taskLogDetail = {
+	0: {
+		level: LogLevels.info,
+		badge: '✅',
+		label: 'success',
+	},
 
-export class Task {
-	error: Error = null;
-	active = true;
-	canceled = false;
+	1: {
+		level: LogLevels.warn,
+		badge: '⚠️',
+		label: 'cancelled',
+	},
 
-	private _start: number = now();
-	private _duration: number = 0;
-
-	constructor(
-		public pid: number,
-		public name: string,
-		private _cancelFn: (pid: number) => void,
-	) {
-		tasks[`${name}:${pid}`] = this;
-	}
-
-	cancel() {
-		this.canceled = true;
-		this._cancelFn(this.pid);
-		this.end();
-	}
-
-	end(err?: Error) {
-		if (this.active) {
-			this.active = false;
-			this.error = err || null;
-			this._duration = now() - this._start;
-		}
-	}
+	2: {
+		level: LogLevels.error,
+		badge: '❌',
+		label: 'failed',
+	},
 }
 
-export function startTask(name: string, cancel: (pid: number) => void, pid: number): Task {
-	return new Task(pid, name, cancel);
+type TaskLogDetail = typeof taskLogDetail;
+
+export function getTaskLogLevel(error: Error, cancelled: boolean) {
+	return (+cancelled + +(error != null)*2) as keyof TaskLogDetail;
 }
 
-export function cancelTask(name: string, pid: number) {
-	const key = `${name}:${pid}`;
-
-	if (tasks.hasOwnProperty(key)) {
-		tasks[key].cancel();
-		delete tasks[key];
-	}
+export function getTaskLogDetail<L extends keyof TaskLogDetail>(level: L): TaskLogDetail[L] {
+	return taskLogDetail[level];
 }

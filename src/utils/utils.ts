@@ -1,3 +1,9 @@
+export const globalThis: Window = Function('return this')();
+
+export function pause(ms: number) {
+	return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 export const now = typeof performance !== 'undefined' && performance.now
 	? () => performance.now()
 	: Date.now

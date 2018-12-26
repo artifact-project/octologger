@@ -1,9 +1,19 @@
-import { parseStack } from "../stack/stack";
+import { parseStack, StackRow } from '../stack/stack';
 
 export interface AnyError extends Error {
 	fileName?: string;
 	lineNumber?: number;
 	columnNumber?: number;
+}
+
+export type XError = {
+	name: string;
+	message: string;
+	fn: string;
+	file: string;
+	line: number;
+	column: number;
+	stack: StackRow[];
 }
 
 const DUMMY = {
@@ -13,7 +23,7 @@ const DUMMY = {
 	column: 0,
 }
 
-export function parseError(err: AnyError) {
+export function parseError(err: AnyError): XError {
 	const stack = parseStack(err.stack);
 	const stackFirstRow = stack[0] || DUMMY;
 

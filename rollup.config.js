@@ -3,15 +3,15 @@ import replace from 'rollup-plugin-replace';
 import { uglify } from 'rollup-plugin-uglify';
 import ts from 'typescript';
 
-const IS_DEV = process.env.NODE_ENV !== 'production';
-
-export default {
+export default ['production', 'dev'].forEach(NODE_ENV => ({
 	input: './index.ts',
+
 	output: {
-		file: IS_DEV ? 'dev.js' : 'index.js',
+		file: NODE_ENV === 'dev' ? 'dev.js' : 'index.js',
 		format: 'umd',
-		name: 'MR',
+		name: 'octologger',
 	},
+
 	plugins: [].concat(
 		typescript({
 			declaration: true,
@@ -19,9 +19,9 @@ export default {
 		}),
 
 		replace({
-			'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV),
+			'process.env.NODE_ENV': JSON.stringify(NODE_ENV),
 		}),
 
-		IS_DEV ? [] : uglify()
+		NODE_ENV === 'dev' ? [] : uglify(),
 	),
-};
+}));

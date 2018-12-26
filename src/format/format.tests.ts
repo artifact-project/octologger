@@ -2,7 +2,7 @@ import { browserFormat as format } from './format';
 import { createLogger, createLogEntry } from '../logger/logger';
 import { LogLevels } from '../logger/levels';
 
-const logger = createLogger(({logger}) => logger);
+const logger = createLogger({}, ({logger}) => logger);
 
 it('badge', () => {
 	let entry = logger.add(createLogEntry(LogLevels.log, 'x', null, null, null));
