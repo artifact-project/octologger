@@ -1,6 +1,6 @@
 OctoLogger
 ----------
-Ultimate logger system for your an application.
+Ultimate logger system for your an application.<br/>
 We Appreciate <s>Power</s>Logs.
 
 ---
