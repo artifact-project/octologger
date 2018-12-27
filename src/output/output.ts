@@ -1,6 +1,6 @@
 import { Format, nodeFromat, browserFormat } from '../format/format';
 import { LogLevelsInvert } from '../logger/levels';
-import { Entry } from '../logger/entry';
+import { Entry } from '../logger/logger.types';
 
 export type Output = (entry: Entry) => void;
 

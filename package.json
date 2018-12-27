@@ -1,7 +1,7 @@
 {
   "name": "octologger",
   "version": "0.1.0",
-  "description": "Scaffold for Artifact project",
+  "description": "Ultimate logger system for your  an application.",
   "author": "RubaXa <trash@rubaxa.org>",
   "license": "MIT",
   "repository": "git@github.com:artifact-project/octologger.git",
@@ -15,7 +15,7 @@
     "prepublishOnly": "npm run test && npm run ts-build",
     "postpublish": "npm run git-clean",
     "rollup": "NODE_ENV=production rollup --config",
-    "build": "nnpm run rollup && npm run git-clean"
+    "build": "npm run rollup && npm run git-clean"
   },
   "files": [
     "*.js",

@@ -1,20 +1,14 @@
 OctoLogger
 ----------
+Ultimate logger system for your an application.
+We Appreciate <s>Power</s>Logs.
 
+---
 
 ### Usage
 
 ```ts
 import { logger } from 'octologger';
-
-
-logger.add('current data', {
-	id: 123,
-	flags: {
-		foo: true,
-		bar: 123,
-	},
-});
 
 logger.info('Wow!');
 logger.scope('users', () => {
@@ -24,19 +18,15 @@ logger.scope('users', () => {
 		logger.done('End');
 	}, 100);
 });
-
-// [[users]]
-//    ⏳ Fetch All
-//         Start
-//           [[setTimeout]] {delay: 100}
-
-// [[users]]
-//    ✅ Fetch All
-//         Start
-//           [[setTimeout]] {delay: 100}
-//              ✅ End
 ```
 
+---
+
+### API
+
+- @todo
+
+---
 
 ### Development
 

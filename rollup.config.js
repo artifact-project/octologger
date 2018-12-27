@@ -3,11 +3,11 @@ import replace from 'rollup-plugin-replace';
 import { uglify } from 'rollup-plugin-uglify';
 import ts from 'typescript';
 
-export default ['production', 'dev'].forEach(NODE_ENV => ({
+export default [true, false].map(dev => ({
 	input: './index.ts',
 
 	output: {
-		file: NODE_ENV === 'dev' ? 'dev.js' : 'index.js',
+		file: `octologger${dev ? '.dev' : ''}.js`,
 		format: 'umd',
 		name: 'octologger',
 	},
@@ -19,9 +19,9 @@ export default ['production', 'dev'].forEach(NODE_ENV => ({
 		}),
 
 		replace({
-			'process.env.NODE_ENV': JSON.stringify(NODE_ENV),
+			'process.env.NODE_ENV': JSON.stringify(dev ? 'dev' : 'production'),
 		}),
 
-		NODE_ENV === 'dev' ? [] : uglify(),
+		dev ? [] : uglify(),
 	),
 }));

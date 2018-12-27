@@ -1,4 +1,4 @@
-import { Entry } from '../logger/logger';
+import { Entry } from '../logger/logger.types';
 import { LogLevelTypes, LogLevelsInvert } from '../logger/levels';
 
 const R_VALUE = /:([^;]+)/g;
