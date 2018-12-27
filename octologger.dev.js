@@ -12,30 +12,23 @@
 	    timeMeasure: 4,
 	};
 
-	var R_AT_WITH_PROTOCOL = /at\s+([^\s]+)(?:.*?)\(((?:http|file|\/)[^)]+:\d+)\)/;
-	var R_AT = /at\s+([^\s]+)(?:.*?)\(((?:http|file|\/)[^)]+:\d+)\)/;
+	var R_AT = /at\s+(?:([^\s]+)(?:.*?)\()?((?:http|file|\/)[^)]+:\d+)\)?/;
 	var R_EXTRACT_FILE1 = /^(.*?)(?:\/<)*@(.*?)$/;
 	var R_EXTRACT_FILE2 = /^()(https?:\/\/.+)/;
 	var R_FILE = /^(.*?):(\d+)(?::(\d+))?$/;
+	var ANONYMOUS = '<anonymous>';
 	function parseStackRow(value) {
 	    if (value == null) {
 	        return null;
 	    }
-	    var line = value.match(R_AT_WITH_PROTOCOL);
-	    if (!line) {
-	        line = value.match(R_AT);
-	        if (line) {
-	            line[0] = '';
-	            line.unshift('');
-	        }
-	        else {
-	            line = value.match(R_EXTRACT_FILE1) || value.match(R_EXTRACT_FILE2);
-	        }
+	    var line = value.match(R_AT);
+	    if (line === null) {
+	        line = value.match(R_EXTRACT_FILE1) || value.match(R_EXTRACT_FILE2);
 	    }
 	    if (line) {
 	        var file = line[2].match(R_FILE);
 	        var row = {
-	            fn: (line[1].trim() || '<anonymous>'),
+	            fn: line[1] === undefined ? ANONYMOUS : (line[1].trim() || ANONYMOUS),
 	            file: '',
 	            line: 0,
 	            column: 0,
@@ -171,11 +164,11 @@
 	        args.push(entry.badge);
 	    }
 	    if (entry.label !== null) {
-	        fmt.push('%c%s%c');
+	        fmt.push('%c%s%c ');
 	        args.push(style.label, entry.label, style.label.replace(R_VALUE, ': inherit'));
 	    }
 	    if (entry.message !== null) {
-	        fmt.push('%c%s');
+	        fmt.push('%c%s ');
 	        args.push(style.base, entry.message);
 	    }
 	    if (entry.detail !== null) {
@@ -186,12 +179,12 @@
 	            args.push(style.base);
 	            for (var i = 0; i < n; i++) {
 	                var val = detail[i];
-	                fmt.push(typeof val === 'string' ? '%s' : '%o');
+	                fmt.push((typeof val === 'string' ? '%s' : '%o') + " ");
 	                args.push(val);
 	            }
 	        }
 	        else {
-	            fmt.push('%o');
+	            fmt.push('%o ');
 	            args.push(detail);
 	        }
 	    }
@@ -199,8 +192,34 @@
 	        fmt.push('%s');
 	        args.push(entry.meta.file + ":" + entry.meta.line + ":" + entry.meta.column + " (" + entry.meta.fn + ")");
 	    }
-	    args.unshift(fmt.join(' '));
+	    args.unshift(fmt.join(''));
 	    return args;
+	});
+
+	var globalThis = Function('return this')();
+	var now = typeof performance !== 'undefined' && performance.now
+	    ? function () { return performance.now(); }
+	    : Date.now;
+
+	var nativeAPI = {};
+	var timersList = [
+	    'Timeout',
+	    'Interval',
+	    'Immediate',
+	    'AnimationFrame',
+	];
+	function eachTimers(scope, iterator) {
+	    timersList.forEach(function (name) {
+	        var isRAF = name === 'AnimationFrame';
+	        var setName = "" + (isRAF ? 'request' : 'set') + name;
+	        var cancelName = "" + (isRAF ? 'cancel' : 'clear') + name;
+	        iterator(isRAF, setName, scope[setName], cancelName, scope[cancelName]);
+	    });
+	}
+	// Save origins
+	eachTimers(globalThis, function (_, setName, setFn, cancelName, cancelFn) {
+	    nativeAPI[setName] = setFn;
+	    nativeAPI[cancelName] = cancelFn;
 	});
 
 	var originalConsole = typeof console !== 'undefined' && console.log ? console : null;
@@ -216,18 +235,82 @@
 	    var log = console.log.apply
 	        ? console.log
 	        : Function.prototype.bind.call(console.log, console);
-	    return function (entry) {
-	        log.apply(console, browserFormat(entry));
-	    };
+	    var groupSupproted = !!console.group;
+	    var groupEndSupproted = !!console.groupEnd;
+	    var groupCollapsedSupproted = !!console.groupCollapsed;
+	    var setTimeout = nativeAPI.setTimeout;
+	    var debounced = {};
+	    var openScopes = [];
+	    function print(entry, skipPrinted) {
+	        var parent = entry.parent;
+	        var opened = openScopes.length;
+	        if (skipPrinted && entry.printed) {
+	            return;
+	        }
+	        if (opened > 0) {
+	            var idx = opened;
+	            while (idx--) {
+	                if (openScopes[idx] === parent) {
+	                    break;
+	                }
+	                else {
+	                    openScopes[idx].printed = true;
+	                    console.groupEnd();
+	                }
+	            }
+	            openScopes.length = idx + 1;
+	        }
+	        if (entry.type === EntryTypes.scope) {
+	            if (entry.detail.state === 'idle') {
+	                entry.printed = true;
+	                log.apply(console, browserFormat(entry));
+	            }
+	            else {
+	                openScopes.push(entry);
+	                console.group.apply(console, browserFormat(entry));
+	            }
+	        }
+	        else {
+	            if (!skipPrinted && parent.printed) {
+	                debounced[parent.cid] || (debounced[parent.cid] = setTimeout(function () {
+	                    openScopes.forEach(function () {
+	                        console.groupEnd();
+	                    });
+	                    openScopes.length = 0;
+	                    var chain = [];
+	                    var cursor = parent;
+	                    do {
+	                        chain.unshift(cursor);
+	                        cursor = cursor.parent;
+	                    } while (cursor.label !== '#root');
+	                    chain.forEach(function (entry) {
+	                        console.group.apply(console, browserFormat(entry));
+	                    });
+	                    parent.entries.forEach(function (entry) {
+	                        print(entry, true);
+	                    });
+	                    chain.forEach(function () {
+	                        console.groupEnd();
+	                    });
+	                }));
+	                return;
+	            }
+	            entry.printed = true;
+	            log.apply(console, browserFormat(entry));
+	        }
+	    }
+	    return print;
 	};
 	var consoleOutput = typeof window !== 'undefined' ? browserOutput : nodeOutput;
 
+	var cid = 0;
 	function isLogEntry(x) {
 	    return x && x.hasOwnProperty('type') && x.hasOwnProperty('level');
 	}
 	function createLogEntry(level, badge, label, message, detail, meta) {
 	    if (meta === void 0) { meta = null; }
 	    return {
+	        cid: ++cid,
 	        type: EntryTypes.entry,
 	        level: level,
 	        badge: badge,
@@ -279,9 +362,11 @@
 	        },
 	    };
 	}
-	function createScopeEntry(level, badge, label, message, detail, meta) {
+	function createScopeEntry(level, badge, label, message, detail, meta, state) {
 	    if (meta === void 0) { meta = null; }
+	    if (state === void 0) { state = null; }
 	    return {
+	        cid: ++cid,
 	        level: level,
 	        type: EntryTypes.scope,
 	        badge: badge,
@@ -290,7 +375,7 @@
 	        message: message,
 	        detail: {
 	            info: detail,
-	            state: null,
+	            state: state,
 	        },
 	        meta: meta,
 	        entries: [],
@@ -351,11 +436,18 @@
 	        logger: logger,
 	    });
 	    // Reserved methods
-	    ['clear', 'scope', 'setup', 'getEntries', 'getLastEntry'].forEach(function (name) {
+	    ['add', 'clear', 'scope', 'setup', 'getEntries', 'getLastEntry'].forEach(function (name) {
 	        if (api.hasOwnProperty(name)) {
 	            throw new SyntaxError("[octologger] \"" + name + "\" is a reserved identifier");
 	        }
 	    });
+	    api.add = function () {
+	        var args = [];
+	        for (var _i = 0; _i < arguments.length; _i++) {
+	            args[_i] = arguments[_i];
+	        }
+	        return logger.add(createLogEntry(LogLevels.log, null, null, null, args));
+	    };
 	    api.clear = function () { return root.entries.splice(0, root.entries.length); };
 	    api.setup = setup;
 	    api.getEntries = function () { return root.entries; };
@@ -368,7 +460,7 @@
 	            executor = detail;
 	            detail = null;
 	        }
-	        var scopeEntry = isLogEntry(message) ? message : createScopeEntry(LogLevels.info, '↘️', null, message, detail, options.meta ? getMeta(2) : null);
+	        var scopeEntry = isLogEntry(message) ? message : createScopeEntry(LogLevels.info, null, null, message, detail, options.meta ? getMeta(2) : null);
 	        _activeScopeContext.logger.add(scopeEntry);
 	        var logger = createCoreLogger(options, { parent: scopeEntry });
 	        var scopeAPI = factory({
@@ -376,6 +468,13 @@
 	            levels: LogLevels,
 	            logger: logger,
 	        });
+	        scopeAPI.add = function () {
+	            var args = [];
+	            for (var _i = 0; _i < arguments.length; _i++) {
+	                args[_i] = arguments[_i];
+	            }
+	            return logger.add(createLogEntry(LogLevels.log, null, null, null, args));
+	        };
 	        scopeAPI.scope = scopeCreator;
 	        scopeAPI._scopeEntry = scopeEntry;
 	        // Переключаем scope
@@ -400,7 +499,14 @@
 	    };
 	    return api;
 	}
-	var octlogger = createLogger({
+	var BADGES = {
+	    info: '❕',
+	    warn: '⚠️',
+	    error: '🛑',
+	    verbose: '🔎',
+	    debug: '⁉️',
+	};
+	var octologger = createLogger({
 	    meta: true,
 	    output: [consoleOutput()],
 	}, function (_a) {
@@ -411,11 +517,162 @@
 	            for (var _i = 0; _i < arguments.length; _i++) {
 	                args[_i] = arguments[_i];
 	            }
-	            logger.add(createLogEntry(levels[level], null, null, null, args));
+	            logger.add(createLogEntry(levels[level], BADGES[level] || null, null, null, args));
 	        };
 	        return api;
 	    }, {});
 	});
+
+	var taskLogDetail = {
+	    0: {
+	        level: LogLevels.info,
+	        badge: null,
+	        label: 'success',
+	    },
+	    1: {
+	        level: LogLevels.warn,
+	        badge: '⚠️',
+	        label: 'cancelled',
+	    },
+	    2: {
+	        level: LogLevels.error,
+	        badge: '❌',
+	        label: 'failed',
+	    },
+	};
+	function getTaskLogLevel(error, cancelled) {
+	    return (+cancelled + +(error != null) * 2);
+	}
+	function getTaskLogDetail(level) {
+	    return taskLogDetail[level];
+	}
+
+	var timers = {};
+	function createTimerTask(ctx, name, delay, callback, nativeCreate, isRAF, params) {
+	    var start = now();
+	    var detail = {
+	        pid: null,
+	        start: start,
+	        delay: delay,
+	    };
+	    var meta = ctx.options.meta ? getMeta(3) : null;
+	    var timerScope = ctx.scope.scope(createScopeEntry(LogLevels.verbose, '⏲', null, "Timer \"" + name + "\" started", detail, meta, 'idle'));
+	    var resolve = function (error, cancelled) {
+	        var level = getTaskLogLevel(error, cancelled);
+	        var logLevel = getTaskLogDetail(level);
+	        timerScope.scope().detail.state = level === 0 ? 'completed' : (level === 1 ? 'cancelled' : 'failed');
+	        ctx.scopeContext.logger.add(createLogEntry(logLevel.level, logLevel.badge, logLevel.label, "Timer \"" + name + "\" " + (level === 0 ? 'completed successfully' : (level === 1 ? 'cancelled' : 'failed')), {
+	            error: error,
+	            cancelled: cancelled,
+	            duration: now() - start,
+	        }, meta));
+	    };
+	    var pid = nativeCreate(function (step) {
+	        var prevContext = switchLoggerContext(ctx, timerScope);
+	        var error;
+	        try {
+	            if (isRAF) {
+	                callback(step);
+	            }
+	            else if (!callback.length || !params.length) {
+	                callback();
+	            }
+	            else {
+	                switch (params.length) {
+	                    case 1:
+	                        callback(params[0]);
+	                        break;
+	                    case 2:
+	                        callback(params[0], params[1]);
+	                        break;
+	                    case 3:
+	                        callback(params[0], params[1], params[2]);
+	                        break;
+	                    case 4:
+	                        callback(params[0], params[1], params[2], params[3]);
+	                        break;
+	                    case 5:
+	                        callback(params[0], params[1], params[2], params[3], params[4]);
+	                        break;
+	                    default:
+	                        callback.apply(void 0, params);
+	                        break;
+	                }
+	            }
+	        }
+	        catch (err) {
+	            error = err;
+	            globalThis.console.error(err);
+	        }
+	        resolve(error, false);
+	        revertLoggerContext(prevContext);
+	    }, delay);
+	    detail.pid = pid;
+	    timers[pid] = {
+	        pid: pid,
+	        resolve: resolve,
+	        ctx: ctx,
+	        scope: timerScope,
+	    };
+	    return pid;
+	}
+	function cancelTimerTask(pid, nativeCancel) {
+	    nativeCancel(pid);
+	    if (timers[pid] === void 0) {
+	        var timer = timers[pid];
+	        var prevContext = switchLoggerContext(timer.ctx, timer.scope);
+	        timer.resolve(null, true);
+	        revertLoggerContext(prevContext);
+	        delete timers[pid];
+	    }
+	}
+
+	function patchTimer(scope, isRAF, createName, nativeCreate, cancelName, nativeCancel) {
+	    scope[createName] = function (callback, delay) {
+	        if (delay === void 0) { delay = 0; }
+	        var params = [];
+	        for (var _i = 2; _i < arguments.length; _i++) {
+	            params[_i - 2] = arguments[_i];
+	        }
+	        var ctx = getLoggerContext();
+	        if (ctx === null) {
+	            return isRAF
+	                ? nativeCreate(callback)
+	                : nativeCreate.apply(void 0, [callback, delay].concat(params));
+	        }
+	        return createTimerTask(ctx, createName, delay, callback, nativeCreate, isRAF, params);
+	    };
+	    scope[cancelName] = function (pid) {
+	        cancelTimerTask(pid, nativeCancel);
+	    };
+	    markAsNativeCode(scope, createName);
+	    markAsNativeCode(scope, cancelName);
+	}
+	function patchTimers(scope) {
+	    eachTimers(nativeAPI, function (isRAF, setName, setFn, cancelName, cancelFn) {
+	        if (scope[setName] === setFn) {
+	            patchTimer(scope, isRAF, setName, setFn, cancelName, cancelFn);
+	        }
+	    });
+	}
+	function revertPatchTimers(scope) {
+	    eachTimers(nativeAPI, function (_, setName, setFn, cancelName, cancelFn) {
+	        scope[setName] = setFn;
+	        scope[cancelName] = cancelFn;
+	    });
+	}
+	function patchNativeAPI(scope) {
+	    patchTimers(scope);
+	}
+	function revertPatchNativeAPI(scope) {
+	    revertPatchTimers(scope);
+	}
+	function markAsNativeCode(scope, method) {
+	    scope[method].toString = function () {
+	        return "function " + method + "() { [native code] }";
+	    };
+	    scope[method].native = nativeAPI[method];
+	}
 
 	exports.EntryTypes = EntryTypes;
 	exports.isLogEntry = isLogEntry;
@@ -426,7 +683,8 @@
 	exports.switchLoggerContext = switchLoggerContext;
 	exports.revertLoggerContext = revertLoggerContext;
 	exports.createLogger = createLogger;
-	exports.octlogger = octlogger;
+	exports.octologger = octologger;
+	exports.logger = octologger;
 	exports.parseError = parseError;
 	exports.createFormat = createFormat;
 	exports.nodeFromat = nodeFromat;
@@ -439,6 +697,10 @@
 	exports.parseStack = parseStack;
 	exports.LogLevels = LogLevels;
 	exports.LogLevelsInvert = LogLevelsInvert;
+	exports.patchTimers = patchTimers;
+	exports.revertPatchTimers = revertPatchTimers;
+	exports.patchNativeAPI = patchNativeAPI;
+	exports.revertPatchNativeAPI = revertPatchNativeAPI;
 
 	Object.defineProperty(exports, '__esModule', { value: true });
 

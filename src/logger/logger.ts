@@ -1,7 +1,9 @@
 import { parseError } from '../error/error';
 import { consoleOutput } from '../output/output';
-import { LogLevels } from './levels';
+import { LogLevels, LogLevelTypes } from './levels';
 import { Entry, EntryTypes, ScopeEntry, LoggerOptions, LoggerAPI, LoggerEnv, Logger, EntryMeta, CoreLogger, LoggerContext, LoggerScope, LoggerScopeContext } from './logger.types';
+
+let cid = 0;
 
 export function isLogEntry(x: any): x is Entry {
 	return x && x.hasOwnProperty('type') && x.hasOwnProperty('level');
@@ -16,6 +18,7 @@ export function createLogEntry(
 	meta: Entry['meta'] = null,
 ): Entry {
 	return {
+		cid: ++cid,
 		type: EntryTypes.entry,
 		level,
 		badge,
@@ -90,8 +93,10 @@ export function createScopeEntry(
 	message: Entry['message'],
 	detail: Entry['detail'],
 	meta: Entry['meta'] = null,
+	state: ScopeEntry['detail']['state'] = null,
 ): ScopeEntry {
 	return {
+		cid: ++cid,
 		level: level,
 		type: EntryTypes.scope,
 		badge,
@@ -100,7 +105,7 @@ export function createScopeEntry(
 		message,
 		detail: {
 			info: detail,
-			state: null,
+			state,
 		},
 		meta,
 		entries: [],
@@ -180,12 +185,14 @@ export function createLogger<LA extends LoggerAPI>(
 	});
 
 	// Reserved methods
-	['clear', 'scope', 'setup', 'getEntries', 'getLastEntry'].forEach((name) => {
+	['add', 'clear', 'scope', 'setup', 'getEntries', 'getLastEntry'].forEach((name) => {
 		if (api.hasOwnProperty(name)) {
 			throw new SyntaxError(`[octologger] "${name}" is a reserved identifier`);
 		}
 	});
 
+
+	api.add = (...args: any[]) => logger.add(createLogEntry(LogLevels.log, null, null, null, args));
 	api.clear = () => root.entries.splice(0, root.entries.length);
 	api.setup = setup;
 	api.getEntries = () => root.entries;
@@ -202,7 +209,7 @@ export function createLogger<LA extends LoggerAPI>(
 
 		const scopeEntry = isLogEntry(message) ? message : createScopeEntry(
 			LogLevels.info,
-			'↘️',
+			null,
 			null,
 			message,
 			detail,
@@ -217,6 +224,7 @@ export function createLogger<LA extends LoggerAPI>(
 			logger,
 		});
 
+		scopeAPI.add = (...args: any[]) => logger.add(createLogEntry(LogLevels.log, null, null, null, args));
 		scopeAPI.scope = scopeCreator;
 		(scopeAPI as any)._scopeEntry = scopeEntry;
 
@@ -250,7 +258,15 @@ export function createLogger<LA extends LoggerAPI>(
 	return api as Logger<LA>;
 }
 
-const octlogger = createLogger({
+const BADGES: {[K in LogLevelTypes]?: string} = {
+	info: '❕',
+	warn: '⚠️',
+	error: '🛑',
+	verbose: '🔎',
+	debug: '⁉️',
+};
+
+const octologger = createLogger({
 	meta: true,
 	output: [consoleOutput()],
 }, ({
@@ -258,7 +274,7 @@ const octlogger = createLogger({
 	logger,
 }) => Object.keys(levels).reduce((api, level) => {
 	api[level] = (...args: any[]) => {
-		logger.add(createLogEntry(levels[level], null, null, null, args));
+		logger.add(createLogEntry(levels[level], BADGES[level] || null, null, null, args));
 	};
 
 	return api;
@@ -267,6 +283,7 @@ const octlogger = createLogger({
 });
 
 export {
-	octlogger,
-	octlogger as default,
+	octologger,
+	octologger as logger,
+	octologger as default,
 };

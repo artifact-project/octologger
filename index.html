@@ -1,0 +1,43 @@
+<html>
+<head>
+	<meta charset="utf-8"/>
+	<title>OctoLogger: Example</title>
+	<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/css/bootstrap.min.css" integrity="sha384-MCw98/SFnGE8fJT3GXwEOngsV7Zt27NXFoaoApmYm81iuXoPkFOJwJ8ERdknLPMO" crossorigin="anonymous"/>
+	<script src="./octologger.dev.js"></script>
+</head>
+<body>
+	<br/>
+	<br/>
+
+	<div class="container">
+		<h1>OctoLogger Example</h1>
+		<div>
+			Open DevTools and see Console.
+		</div>
+	</div>
+
+	<script>
+		octologger.patchNativeAPI(window);
+
+		(function main(logger) {
+			logger.scope('Session', {started: new Date().toISOString()}, () => {
+				logger.scope('Application', function appScope() {
+					logger.add('Initialization', {version: '1.0.6'});
+
+					setTimeout(function appInit() {
+						logger.verbose('Ready to use');
+					}, 5);
+				});
+			});
+
+			logger.scope('Project ', () => {
+				logger.add('Name:', 'OctoLogger');
+				logger.add('Copyright:', {
+					author: 'RubaXa <ibn@rubaxa.org>',
+					license: 'MIT',
+				});
+			});
+		})(octologger.logger);
+	</script>
+</body>
+</html>

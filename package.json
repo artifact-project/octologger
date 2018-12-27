@@ -14,7 +14,8 @@
     "postinstall": "npm run installHooks && npm run build",
     "prepublishOnly": "npm run test && npm run ts-build",
     "postpublish": "npm run git-clean",
-    "rollup": "NODE_ENV=production rollup --config",
+    "rollup": "rollup --config",
+    "watch": "rollup --config --watch",
     "build": "npm run rollup && npm run git-clean"
   },
   "files": [

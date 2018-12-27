@@ -117,16 +117,16 @@ export const browserFormat = createFormat(
 
 		if (entry.badge !== null) {
 			fmt.push('%s');
-			args.push(entry.badge)
+			args.push(entry.badge);
 		}
 
 		if (entry.label !== null) {
-			fmt.push('%c%s%c');
+			fmt.push('%c%s%c ');
 			args.push(style.label, entry.label, style.label.replace(R_VALUE, ': inherit'));
 		}
 
 		if (entry.message !== null) {
-			fmt.push('%c%s');
+			fmt.push('%c%s ');
 			args.push(style.base, entry.message);
 		}
 
@@ -141,11 +141,11 @@ export const browserFormat = createFormat(
 				for (let i = 0; i < n; i++) {
 					const val = detail[i];
 
-					fmt.push(typeof val === 'string' ? '%s' : '%o');
+					fmt.push(`${typeof val === 'string' ? '%s' : '%o'} `);
 					args.push(val);
 				}
 			} else {
-				fmt.push('%o');
+				fmt.push('%o ');
 				args.push(detail);
 			}
 		}
@@ -155,7 +155,7 @@ export const browserFormat = createFormat(
 			args.push(`${entry.meta.file}:${entry.meta.line}:${entry.meta.column} (${entry.meta.fn})`);
 		}
 
-		args.unshift(fmt.join(' '));
+		args.unshift(fmt.join(''));
 
 		return args;
 	},

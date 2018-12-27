@@ -1,7 +1,9 @@
 export const globalThis: Window = Function('return this')();
 
 export function pause(ms: number) {
-	return new Promise(resolve => setTimeout(resolve, ms));
+	return new Promise(resolve => {
+		setTimeout(resolve, ms);
+	});
 }
 
 export const now = typeof performance !== 'undefined' && performance.now
@@ -15,7 +17,7 @@ export function setHiddenProp<
 	V extends any,
 	R extends T & {
 		readonly [X in K]: V;
-	},
+	}
 >(target: T, name: K, value: V): R {
 	Object.defineProperty(target, name, {
 		value,
@@ -31,7 +33,7 @@ export function setReadOnlyProp<
 	V extends any,
 	R extends T & {
 		readonly [X in K]: V;
-	},
+	}
 >(target: T, name: K, value: V): R {
 	Object.defineProperty(target, name, {
 		value,
@@ -45,7 +47,7 @@ export function setReadOnlyProp<
 export function setReadOnlyProps<
 	T extends object,
 	P extends object,
-	R extends T & {readonly [K in keyof P]: P[K]},
+	R extends T & {readonly [K in keyof P]: P[K]}
 >(target: T, props: P): R {
 	for (let key in props) {
 		if (props.hasOwnProperty(key)) {
@@ -59,7 +61,7 @@ export function setReadOnlyProps<
 export function setHiddenProps<
 	T extends object,
 	P extends object,
-	R extends T & {readonly [K in keyof P]: P[K]},
+	R extends T & {readonly [K in keyof P]: P[K]}
 >(target: T, props: P): R {
 	for (let key in props) {
 		if (props.hasOwnProperty(key)) {

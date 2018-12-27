@@ -11,7 +11,7 @@ export const EntryTypes = {
 
 export type CoreLogger = {
 	add(entry: Entry): Entry;
-	add(label: string, detail?: any): Entry;
+	add(message: string, detail?: any): Entry;
 }
 
 export type LoggerAPI = {
@@ -31,6 +31,7 @@ export type LoggerEnv = {
 }
 
 export interface Entry {
+	cid: number;
 	type: number;
 	badge: string;
 	level: number;
@@ -60,6 +61,8 @@ export type ScopeExecutor<LA extends LoggerAPI, LS extends LoggerScope<LA>> = (s
 export type LoggerScope<LA extends LoggerAPI> = {
 	[K in keyof LA]: LA[K];
 } & {
+	add(...args: any[]): Entry;
+
 	scope(): ScopeEntry; // current scope
 
 	scope(
@@ -76,6 +79,7 @@ export type LoggerScope<LA extends LoggerAPI> = {
 
 export type Logger<LA extends LoggerAPI> = LoggerScope<LA> & {
 	setup: LoggerEnv['setup'];
+	add(...args: any[]): Entry;
 	clear(): Entry[];
 	getEntries(): Entry[];
 	getLastEntry(): Entry;

@@ -3,7 +3,7 @@ import { LogLevels } from '../logger/levels';
 const taskLogDetail = {
 	0: {
 		level: LogLevels.info,
-		badge: '✅',
+		badge: null,
 		label: 'success',
 	},
 
@@ -22,10 +22,10 @@ const taskLogDetail = {
 
 type TaskLogDetail = typeof taskLogDetail;
 
-export function getTaskLogLevel(error: Error, cancelled: boolean) {
-	return (+cancelled + +(error != null)*2) as keyof TaskLogDetail;
+export function getTaskLogLevel(error: Error, cancelled: boolean): number {
+	return (+cancelled + +(error != null)*2);
 }
 
-export function getTaskLogDetail<L extends keyof TaskLogDetail>(level: L): TaskLogDetail[L] {
+export function getTaskLogDetail(level: number): {level: number; badge: string; label: string} {
 	return taskLogDetail[level];
 }

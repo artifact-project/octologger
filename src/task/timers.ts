@@ -1,4 +1,4 @@
-import { now } from '../utils/utils';
+import { now, globalThis } from '../utils/utils';
 import { getTaskLogLevel, getTaskLogDetail } from './task';
 import { switchLoggerContext, createLogEntry, revertLoggerContext, createScopeEntry, getMeta } from '../logger/logger';
 import { LoggerContext } from '../logger/logger.types';
@@ -29,8 +29,8 @@ export function createTimerTask(
 		`Timer "${name}" started`,
 		detail,
 		meta,
+		'idle',
 	));
-	timerScope.scope().detail.state = 'idle';
 
 	const resolve = (error: Error, cancelled: boolean) => {
 		const level = getTaskLogLevel(error, cancelled);
@@ -72,6 +72,7 @@ export function createTimerTask(
 			}
 		} catch (err) {
 			error = err;
+			globalThis.console.error(err);
 		}
 
 		resolve(error, false);
@@ -92,7 +93,7 @@ export function createTimerTask(
 export function cancelTimerTask(pid: number, nativeCancel: Function) {
 	nativeCancel(pid);
 
-	if (timers.hasOwnProperty(pid)) {
+	if (timers[pid] === void 0) {
 		const timer = timers[pid];
 		const prevContext = switchLoggerContext(timer.ctx, timer.scope);
 

@@ -68,3 +68,20 @@ it('eval anonymous', () => {
 		column: 25417,
 	});
 });
+
+
+it('error in html', () => {
+	const error = new Error('html');
+	const file = 'file:///Users/k.lebedev/Developer/artifact-project/octologger/index.html'
+	const line = 26;
+	const column = 15;
+
+	error.stack = `Error: html\n    at ${file}:${line}:${column}`;
+
+	expect(parseStackRow(`at ${file}:${line}:${column}`)).toEqual({
+		fn: '<anonymous>',
+		file,
+		line,
+		column,
+	});
+});

@@ -1,5 +1,4 @@
-const R_AT_WITH_PROTOCOL = /at\s+([^\s]+)(?:.*?)\(((?:http|file|\/)[^)]+:\d+)\)/;
-const R_AT = /at\s+([^\s]+)(?:.*?)\(((?:http|file|\/)[^)]+:\d+)\)/;
+const R_AT = /at\s+(?:([^\s]+)(?:.*?)\()?((?:http|file|\/)[^)]+:\d+)\)?/;
 const R_EXTRACT_FILE1 = /^(.*?)(?:\/<)*@(.*?)$/;
 const R_EXTRACT_FILE2 = /^()(https?:\/\/.+)/;
 const R_FILE = /^(.*?):(\d+)(?::(\d+))?$/;
@@ -11,28 +10,23 @@ export type StackRow = {
 	column: number;
 }
 
+const ANONYMOUS = '<anonymous>';
+
 export function parseStackRow(value: string): StackRow {
 	if (value == null) {
 		return null;
 	}
 
-	let line = value.match(R_AT_WITH_PROTOCOL);
+	let line = value.match(R_AT);
 
-	if (!line) {
-		line = value.match(R_AT);
-
-		if (line) {
-			line[0] = '';
-			line.unshift('');
-		} else {
-			line = value.match(R_EXTRACT_FILE1) || value.match(R_EXTRACT_FILE2);
-		}
+	if (line === null) {
+		line = value.match(R_EXTRACT_FILE1) || value.match(R_EXTRACT_FILE2);
 	}
 
 	if (line) {
 		const file = line[2].match(R_FILE);
 		const row = {
-			fn: (line[1].trim() || '<anonymous>'),
+			fn: line[1] === undefined ? ANONYMOUS : (line[1].trim() || ANONYMOUS),
 			file: '',
 			line: 0,
 			column: 0,

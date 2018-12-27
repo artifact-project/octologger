@@ -6,3 +6,4 @@ export * from './src/format/format';
 export * from './src/output/output';
 export * from './src/stack/stack';
 export * from './src/logger/levels';
+export * from './src/patcher/patcher';
