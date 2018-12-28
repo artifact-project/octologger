@@ -4,7 +4,8 @@ export const LogLevels = {
 	info: 2,
 	verbose: 3,
 	debug: 4,
-	log: 5
+	log: 5,
+	success: 6,
 };
 
 export const LogLevelsInvert = {} as {

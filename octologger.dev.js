@@ -18,7 +18,8 @@
 	    info: 2,
 	    verbose: 3,
 	    debug: 4,
-	    log: 5
+	    log: 5,
+	    success: 6,
 	};
 	var LogLevelsInvert = {};
 	for (var key in LogLevels) {
@@ -41,6 +42,7 @@
 	        warn: '\x1b[33m',
 	        log: '\x1b[0m',
 	        info: '\x1b[34m',
+	        success: '\x1b[34m',
 	        verbose: '\x1b[35m',
 	        debug: '\x1b[35m',
 	    },
@@ -49,6 +51,7 @@
 	        warn: '\x1b[4m',
 	        log: '\x1b[4m',
 	        info: '\x1b[4m',
+	        success: '\x1b[4m',
 	        verbose: '\x1b[4m',
 	        debug: '\x1b[4m',
 	        silly: '\x1b[4m',
@@ -73,23 +76,26 @@
 	    args.push('\x1b[0m');
 	    return args;
 	});
+	var LABEL_STYLE = 'text-decoration: underline; font-weight: bold;';
 	var browserFormat = createFormat({
 	    level: {
 	        error: 'color: red;',
 	        warn: 'color: orange;',
 	        log: 'color: #333;',
+	        success: 'color: #1aaa55;',
 	        info: 'color: dodgerblue;',
 	        verbose: 'color: magenta;',
 	        debug: 'color: #8b1fdd;',
 	    },
 	    label: {
-	        error: 'text-decoration: underline;',
-	        warn: 'text-decoration: underline;',
-	        log: 'text-decoration: underline;',
-	        info: 'text-decoration: underline;',
-	        verbose: 'text-decoration: underline;',
-	        debug: 'text-decoration: underline;',
-	        silly: 'text-decoration: underline;',
+	        error: LABEL_STYLE,
+	        warn: LABEL_STYLE,
+	        log: LABEL_STYLE,
+	        info: LABEL_STYLE,
+	        success: LABEL_STYLE,
+	        verbose: LABEL_STYLE,
+	        debug: LABEL_STYLE,
+	        silly: LABEL_STYLE,
 	    },
 	}, function (_, entry, style) {
 	    var fmt = [];
@@ -100,13 +106,13 @@
 	    }
 	    if (entry.label !== null) {
 	        fmt.push('%c%s%c ');
-	        args.push(style.label, entry.label, style.label.replace(R_VALUE, ': inherit'));
+	        args.push(style.label + style.base, entry.label, style.label.replace(R_VALUE, ': inherit'));
 	    }
 	    if (entry.message !== null) {
 	        fmt.push('%c%s ');
 	        args.push(style.base, entry.message);
 	    }
-	    if (entry.detail !== null) {
+	    if (entry.detail != null) {
 	        var detail = entry.detail;
 	        var n = detail.length;
 	        if (entry.message === null && n >= 0 && (0 in detail)) {
@@ -164,8 +170,8 @@
 	        if (entry === null) {
 	            return;
 	        }
-	        var level = LogLevelsInvert[entry.level];
-	        console[level].apply(console, nodeFromat(entry));
+	        var fn = LogLevelsInvert[entry.level === 6 ? LogLevels.info : entry.level];
+	        console[fn].apply(console, nodeFromat(entry));
 	    };
 	};
 	var browserOutput = function (console) {
@@ -319,7 +325,7 @@
 	    var error = new Error();
 	    var stack = error.stack.split('\n');
 	    Error.stackTraceLimit = stackTraceLimit;
-	    if (stack[offset + 1] === null) {
+	    if (stack.length <= offset + 1) {
 	        return null;
 	    }
 	    return parseStackRow(stack[offset + 1]);
@@ -520,6 +526,7 @@
 	    error: '🛑',
 	    verbose: '🔎',
 	    debug: '⁉️',
+	    success: '✅',
 	};
 	var octologger = createLogger({
 	    meta: true,

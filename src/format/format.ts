@@ -45,6 +45,7 @@ export const nodeFromat = createFormat(
 			warn: '\x1b[33m',
 			log: '\x1b[0m',
 			info: '\x1b[34m',
+			success: '\x1b[34m',
 			verbose: '\x1b[35m',
 			debug: '\x1b[35m',
 		},
@@ -54,6 +55,7 @@ export const nodeFromat = createFormat(
 			warn: '\x1b[4m',
 			log: '\x1b[4m',
 			info: '\x1b[4m',
+			success: '\x1b[4m',
 			verbose: '\x1b[4m',
 			debug: '\x1b[4m',
 			silly: '\x1b[4m',
@@ -89,25 +91,29 @@ export const nodeFromat = createFormat(
 	},
 );
 
+const LABEL_STYLE = 'text-decoration: underline; font-weight: bold;';
+
 export const browserFormat = createFormat(
 	{
 		level: {
 			error: 'color: red;',
 			warn: 'color: orange;',
 			log: 'color: #333;',
+			success: 'color: #1aaa55;',
 			info: 'color: dodgerblue;',
 			verbose: 'color: magenta;',
 			debug: 'color: #8b1fdd;',
 		},
 
 		label: {
-			error: 'text-decoration: underline;',
-			warn: 'text-decoration: underline;',
-			log: 'text-decoration: underline;',
-			info: 'text-decoration: underline;',
-			verbose: 'text-decoration: underline;',
-			debug: 'text-decoration: underline;',
-			silly: 'text-decoration: underline;',
+			error: LABEL_STYLE,
+			warn: LABEL_STYLE,
+			log: LABEL_STYLE,
+			info: LABEL_STYLE,
+			success: LABEL_STYLE,
+			verbose: LABEL_STYLE,
+			debug: LABEL_STYLE,
+			silly: LABEL_STYLE,
 		},
 	},
 
@@ -122,7 +128,7 @@ export const browserFormat = createFormat(
 
 		if (entry.label !== null) {
 			fmt.push('%c%s%c ');
-			args.push(style.label, entry.label, style.label.replace(R_VALUE, ': inherit'));
+			args.push(style.label + style.base, entry.label, style.label.replace(R_VALUE, ': inherit'));
 		}
 
 		if (entry.message !== null) {
@@ -130,7 +136,7 @@ export const browserFormat = createFormat(
 			args.push(style.base, entry.message);
 		}
 
-		if (entry.detail !== null) {
+		if (entry.detail != null) {
 			const {detail} = entry;
 			const n = detail.length;
 

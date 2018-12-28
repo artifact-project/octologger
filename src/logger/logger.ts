@@ -1,4 +1,3 @@
-import { parseError } from '../error/error';
 import { consoleOutput } from '../output/output';
 import { LogLevels, LogLevelTypes } from './levels';
 import { Entry, EntryTypes, ScopeEntry, LoggerOptions, LoggerAPI, LoggerEnv, Logger, EntryMeta, CoreLogger, LoggerContext, LoggerScope, LoggerScopeContext } from './logger.types';
@@ -42,7 +41,7 @@ export function getMeta(offset: number = 0): EntryMeta {
 
 	Error.stackTraceLimit = stackTraceLimit;
 
-	if (stack[offset + 1] === null) {
+	if (stack.length <= offset + 1) {
 		return null;
 	}
 
@@ -297,6 +296,7 @@ const BADGES: {[K in LogLevelTypes]?: string} = {
 	error: '🛑',
 	verbose: '🔎',
 	debug: '⁉️',
+	success: '✅',
 };
 
 const octologger = createLogger({

@@ -1,5 +1,5 @@
 import { Format, nodeFromat, browserFormat } from '../format/format';
-import { LogLevelsInvert } from '../logger/levels';
+import { LogLevelsInvert, LogLevels } from '../logger/levels';
 import { Entry, EntryTypes } from '../logger/logger.types';
 import { nativeAPI } from '../patcher/native';
 
@@ -17,8 +17,8 @@ export const nodeOutput = (console: Console = originalConsole): Output => {
 			return;
 		}
 
-		const level = LogLevelsInvert[entry.level];
-		console[level](...nodeFromat(entry));
+		const fn = LogLevelsInvert[entry.level === 6 ? LogLevels.info : entry.level];
+		console[fn](...nodeFromat(entry));
 	};
 };
 

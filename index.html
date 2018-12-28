@@ -20,13 +20,13 @@
 		octologger.patchNativeAPI(window);
 		octologger.logger.setup({silent: false, meta: !false});
 
-		0 && (function main(logger) {
+		(function main(logger) {
 			logger.scope('Session', {started: new Date().toISOString()}, () => {
 				logger.scope('Application', function appScope() {
 					logger.add('Initialization', {version: '1.0.6'});
 
 					setTimeout(function appInit() {
-						logger.verbose('Ready to use');
+						logger.success('Ready to use');
 					}, 1);
 				});
 			});
@@ -38,17 +38,6 @@
 					license: 'MIT',
 				});
 			});
-		})(octologger.logger);
-	</script>
-
-	<script>
-		(function main(logger) {
-
-
-logger.info('Свой логер');
-console.log('Нативный вариант');
-
-
 		})(octologger.logger);
 	</script>
 </body>
