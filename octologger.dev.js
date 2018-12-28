@@ -12,71 +12,6 @@
 	    timeMeasure: 4,
 	};
 
-	var R_AT = /at\s+(?:([^\s]+)(?:.*?)\()?((?:http|file|\/)[^)]+:\d+)\)?/;
-	var R_EXTRACT_FILE1 = /^(.*?)(?:\/<)*@(.*?)$/;
-	var R_EXTRACT_FILE2 = /^()(https?:\/\/.+)/;
-	var R_FILE = /^(.*?):(\d+)(?::(\d+))?$/;
-	var ANONYMOUS = '<anonymous>';
-	function parseStackRow(value) {
-	    if (value == null) {
-	        return null;
-	    }
-	    var line = value.match(R_AT);
-	    if (line === null) {
-	        line = value.match(R_EXTRACT_FILE1) || value.match(R_EXTRACT_FILE2);
-	    }
-	    if (line) {
-	        var file = line[2].match(R_FILE);
-	        var row = {
-	            fn: line[1] === undefined ? ANONYMOUS : (line[1].trim() || ANONYMOUS),
-	            file: '',
-	            line: 0,
-	            column: 0,
-	        };
-	        if (file) {
-	            row.file = file[1];
-	            row.line = parseInt(file[2], 10) || 0;
-	            row.column = parseInt(file[3], 10) || 0;
-	        }
-	        return row;
-	    }
-	    return null;
-	}
-	function parseStack(stack) {
-	    if (stack == null) {
-	        return null;
-	    }
-	    var rows = stack.trim().split('\n');
-	    var list = [];
-	    for (var i = 0; i < rows.length; i++) {
-	        var row = parseStackRow(rows[i]);
-	        if (row !== null) {
-	            list.push(row);
-	        }
-	    }
-	    return list;
-	}
-
-	var DUMMY = {
-	    fn: '<anonymous>',
-	    file: '',
-	    line: 0,
-	    column: 0,
-	};
-	function parseError(err) {
-	    var stack = parseStack(err.stack);
-	    var stackFirstRow = stack[0] || DUMMY;
-	    return {
-	        name: err.name,
-	        message: err.message,
-	        fn: stackFirstRow.fn,
-	        file: err.fileName || stackFirstRow.file,
-	        line: err.lineNumber || stackFirstRow.line,
-	        column: err.columnNumber || stackFirstRow.column,
-	        stack: stack,
-	    };
-	}
-
 	var LogLevels = {
 	    error: 0,
 	    warn: 1,
@@ -313,6 +248,51 @@
 	};
 	var consoleOutput = typeof window !== 'undefined' ? browserOutput : nodeOutput;
 
+	var R_AT = /at\s+(?:([^\s]+)(?:.*?)\()?((?:http|file|\/)[^)]+:\d+)\)?/;
+	var R_EXTRACT_FILE1 = /^(.*?)(?:\/<)*@(.*?)$/;
+	var R_EXTRACT_FILE2 = /^()(https?:\/\/.+)/;
+	var R_FILE = /^(.*?):(\d+)(?::(\d+))?$/;
+	var ANONYMOUS = '<anonymous>';
+	function parseStackRow(value) {
+	    if (value == null) {
+	        return null;
+	    }
+	    var line = value.match(R_AT);
+	    if (line === null) {
+	        line = value.match(R_EXTRACT_FILE1) || value.match(R_EXTRACT_FILE2);
+	    }
+	    if (line) {
+	        var file = line[2].match(R_FILE);
+	        var row = {
+	            fn: line[1] === undefined ? ANONYMOUS : (line[1].trim() || ANONYMOUS),
+	            file: '',
+	            line: 0,
+	            column: 0,
+	        };
+	        if (file) {
+	            row.file = file[1];
+	            row.line = parseInt(file[2], 10) || 0;
+	            row.column = parseInt(file[3], 10) || 0;
+	        }
+	        return row;
+	    }
+	    return null;
+	}
+	function parseStack(stack) {
+	    if (stack == null) {
+	        return null;
+	    }
+	    var rows = stack.trim().split('\n');
+	    var list = [];
+	    for (var i = 0; i < rows.length; i++) {
+	        var row = parseStackRow(rows[i]);
+	        if (row !== null) {
+	            list.push(row);
+	        }
+	    }
+	    return list;
+	}
+
 	var cid = 0;
 	function isLogEntry(x) {
 	    return x && x.hasOwnProperty('type') && x.hasOwnProperty('level');
@@ -334,16 +314,15 @@
 	}
 	function getMeta(offset) {
 	    if (offset === void 0) { offset = 0; }
-	    var stack = parseError(new Error).stack;
-	    if (stack.length <= offset) {
+	    var stackTraceLimit = Error.stackTraceLimit;
+	    Error.stackTraceLimit = offset + 1;
+	    var error = new Error();
+	    var stack = (error.valueOf() || error.stack).split('\n');
+	    Error.stackTraceLimit = stackTraceLimit;
+	    if (stack[offset + 1] === null) {
 	        return null;
 	    }
-	    return {
-	        fn: stack[offset].fn,
-	        file: stack[offset].file,
-	        line: stack[offset].line,
-	        column: stack[offset].column,
-	    };
+	    return parseStackRow(stack[offset + 1]);
 	}
 	function createCoreLogger(options, ctx) {
 	    return {
@@ -558,6 +537,26 @@
 	        return api;
 	    }, {});
 	});
+
+	var DUMMY = {
+	    fn: '<anonymous>',
+	    file: '',
+	    line: 0,
+	    column: 0,
+	};
+	function parseError(err) {
+	    var stack = parseStack(err.stack);
+	    var stackFirstRow = stack[0] || DUMMY;
+	    return {
+	        name: err.name,
+	        message: err.message,
+	        fn: stackFirstRow.fn,
+	        file: err.fileName || stackFirstRow.file,
+	        line: err.lineNumber || stackFirstRow.line,
+	        column: err.columnNumber || stackFirstRow.column,
+	        stack: stack,
+	    };
+	}
 
 	var taskLogDetail = {
 	    0: {

@@ -2,6 +2,7 @@ import { parseError } from '../error/error';
 import { consoleOutput } from '../output/output';
 import { LogLevels, LogLevelTypes } from './levels';
 import { Entry, EntryTypes, ScopeEntry, LoggerOptions, LoggerAPI, LoggerEnv, Logger, EntryMeta, CoreLogger, LoggerContext, LoggerScope, LoggerScopeContext } from './logger.types';
+import { parseStackRow } from '../stack/stack';
 
 let cid = 0;
 
@@ -32,18 +33,20 @@ export function createLogEntry(
 }
 
 export function getMeta(offset: number = 0): EntryMeta {
-	const stack = parseError(new Error).stack;
+	const stackTraceLimit = Error.stackTraceLimit;
 
-	if (stack.length <= offset) {
+	Error.stackTraceLimit = offset + 1;
+
+	const error = new Error();
+	const stack = (error.valueOf() as string || error.stack).split('\n');
+
+	Error.stackTraceLimit = stackTraceLimit;
+
+	if (stack[offset + 1] === null) {
 		return null;
 	}
 
-	return {
-		fn: stack[offset].fn,
-		file: stack[offset].file,
-		line: stack[offset].line,
-		column: stack[offset].column,
-	}
+	return parseStackRow(stack[offset + 1])
 }
 
 function createCoreLogger(options: Partial<LoggerOptions>, ctx: LoggerScopeContext) {
