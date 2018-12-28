@@ -20,6 +20,7 @@ export type LoggerAPI = {
 
 export type LoggerOptions = {
 	meta: boolean;
+	silent: boolean;
 	storeLast: number;
 	output: Output[];
 }
@@ -80,6 +81,7 @@ export type LoggerScope<LA extends LoggerAPI> = {
 export type Logger<LA extends LoggerAPI> = LoggerScope<LA> & {
 	setup: LoggerEnv['setup'];
 	add(...args: any[]): Entry;
+	print(): void;
 	clear(): Entry[];
 	getEntries(): Entry[];
 	getLastEntry(): Entry;

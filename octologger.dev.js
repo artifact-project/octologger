@@ -226,6 +226,9 @@
 	var nodeOutput = function (console) {
 	    if (console === void 0) { console = originalConsole; }
 	    return function (entry) {
+	        if (entry === null) {
+	            return;
+	        }
 	        var level = LogLevelsInvert[entry.level];
 	        console[level].apply(console, nodeFromat(entry));
 	    };
@@ -242,6 +245,13 @@
 	    var debounced = {};
 	    var openScopes = [];
 	    function print(entry, skipPrinted) {
+	        if (entry === null) {
+	            openScopes.forEach(function () {
+	                console.groupEnd();
+	            });
+	            openScopes.length = 0;
+	            return;
+	        }
 	        var parent = entry.parent;
 	        var opened = openScopes.length;
 	        if (skipPrinted && entry.printed) {
@@ -271,7 +281,7 @@
 	            }
 	        }
 	        else {
-	            if (!skipPrinted && parent.printed) {
+	            if (!skipPrinted && parent.printed && parent.label !== '#root') {
 	                debounced[parent.cid] || (debounced[parent.cid] = setTimeout(function () {
 	                    openScopes.forEach(function () {
 	                        console.groupEnd();
@@ -354,9 +364,11 @@
 	            if (length > options.storeLast) {
 	                parent.entries.splice(0, 1);
 	            }
-	            var idx = options.output.length;
-	            while (idx--) {
-	                options.output[idx](entry);
+	            if (options.silent !== true) {
+	                var idx = options.output.length;
+	                while (idx--) {
+	                    options.output[idx](entry);
+	                }
 	            }
 	            return entry;
 	        },
@@ -406,6 +418,9 @@
 	    switchLoggerContext(snapshot.context, snapshot.scope);
 	}
 	function createLogger(options, factory) {
+	    if (options.silent == null) {
+	        options.silent = !/^(file:|https?:\/\/localhost\/)/.test(location + '');
+	    }
 	    if (options.meta == null) {
 	        options.meta = false;
 	    }
@@ -441,6 +456,27 @@
 	            throw new SyntaxError("[octologger] \"" + name + "\" is a reserved identifier");
 	        }
 	    });
+	    api.print = function () {
+	        function next(root) {
+	            root.printed = false;
+	            root.entries.forEach(function (entry) {
+	                var idx = options.output.length;
+	                while (idx--) {
+	                    entry.printed = false;
+	                    options.output[idx](entry);
+	                }
+	                if (entry.type === EntryTypes.scope) {
+	                    next(entry);
+	                }
+	            });
+	        }
+	        next(root);
+	        // Close all groups
+	        var idx = options.output.length;
+	        while (idx--) {
+	            options.output[idx](null);
+	        }
+	    };
 	    api.add = function () {
 	        var args = [];
 	        for (var _i = 0; _i < arguments.length; _i++) {

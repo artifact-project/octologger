@@ -76,9 +76,11 @@ function createCoreLogger(options: Partial<LoggerOptions>, ctx: LoggerScopeConte
 				parent.entries.splice(0, 1);
 			}
 
-			let idx = options.output.length;
-			while (idx--) {
-				options.output[idx](entry);
+			if (options.silent !== true) {
+				let idx = options.output.length;
+				while (idx--) {
+					options.output[idx](entry);
+				}
 			}
 
 			return entry;
@@ -148,6 +150,10 @@ export function createLogger<LA extends LoggerAPI>(
 	options: Partial<LoggerOptions>,
 	factory: (env: LoggerEnv) => LA,
 ): Logger<LA> {
+	if (options.silent == null) {
+		options.silent = !/^(file:|https?:\/\/localhost\/)/.test(location + '');
+	}
+
 	if (options.meta == null) {
 		options.meta = false;
 	}
@@ -191,6 +197,30 @@ export function createLogger<LA extends LoggerAPI>(
 		}
 	});
 
+	api.print = () => {
+		function next(root: Entry & {printed?: boolean}) {
+			root.printed = false;
+			root.entries.forEach((entry: Entry & {printed?: boolean}) => {
+				let idx = options.output.length;
+				while (idx--) {
+					entry.printed = false;
+					options.output[idx](entry);
+				}
+
+				if (entry.type === EntryTypes.scope) {
+					next(entry);
+				}
+			});
+		}
+
+		next(root);
+
+		// Close all groups
+		let idx = options.output.length;
+		while (idx--) {
+			options.output[idx](null);
+		}
+	};
 
 	api.add = (...args: any[]) => logger.add(createLogEntry(LogLevels.log, null, null, null, args));
 	api.clear = () => root.entries.splice(0, root.entries.length);
