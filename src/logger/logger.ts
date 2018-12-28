@@ -38,7 +38,7 @@ export function getMeta(offset: number = 0): EntryMeta {
 	Error.stackTraceLimit = offset + 1;
 
 	const error = new Error();
-	const stack = (error.valueOf() as string || error.stack).split('\n');
+	const stack = error.stack.split('\n');
 
 	Error.stackTraceLimit = stackTraceLimit;
 

@@ -317,7 +317,7 @@
 	    var stackTraceLimit = Error.stackTraceLimit;
 	    Error.stackTraceLimit = offset + 1;
 	    var error = new Error();
-	    var stack = (error.valueOf() || error.stack).split('\n');
+	    var stack = error.stack.split('\n');
 	    Error.stackTraceLimit = stackTraceLimit;
 	    if (stack[offset + 1] === null) {
 	        return null;
