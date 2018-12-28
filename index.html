@@ -18,6 +18,7 @@
 
 	<script>
 		octologger.patchNativeAPI(window);
+		octologger.setup({silent: false});
 
 		0 && (function main(logger) {
 			logger.scope('Session', {started: new Date().toISOString()}, () => {
