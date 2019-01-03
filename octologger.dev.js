@@ -142,7 +142,9 @@
 	    ? function () { return performance.now(); }
 	    : Date.now;
 
-	var nativeAPI = {};
+	var nativeAPI = {
+	    console: globalThis.console,
+	};
 	var timersList = [
 	    'Timeout',
 	    'Interval',

@@ -1,6 +1,8 @@
 import { globalThis } from '../utils/utils';
 
-export const nativeAPI = {} as Pick<Window & {
+export const nativeAPI = {
+	console: globalThis.console,
+} as Pick<Window & {
 	setImmediate: (fn: () => void) => number;
 	cancelIdleCallback: (pid: number) => void;
 },
@@ -10,6 +12,7 @@ export const nativeAPI = {} as Pick<Window & {
 	| 'clearInterval'
 	| 'setImmediate'
 	| 'requestAnimationFrame'
+	| 'console'
 >;
 
 const timersList = [
