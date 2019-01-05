@@ -26,6 +26,51 @@
 	    LogLevelsInvert[LogLevels[key]] = key;
 	}
 
+	var R_AT = /at\s+(?:([^\s]+)(?:.*?)\()?((?:http|file|\/)[^)]+:\d+)\)?/;
+	var R_EXTRACT_FILE1 = /^(.*?)(?:\/<)*@(.*?)$/;
+	var R_EXTRACT_FILE2 = /^()(https?:\/\/.+)/;
+	var R_FILE = /^(.*?):(\d+)(?::(\d+))?$/;
+	var ANONYMOUS = '<anonymous>';
+	function parseStackRow(value) {
+	    if (value == null) {
+	        return null;
+	    }
+	    var line = value.match(R_AT);
+	    if (line === null) {
+	        line = value.match(R_EXTRACT_FILE1) || value.match(R_EXTRACT_FILE2);
+	    }
+	    if (line) {
+	        var file = line[2].match(R_FILE);
+	        var row = {
+	            fn: line[1] === undefined ? ANONYMOUS : (line[1].trim() || ANONYMOUS),
+	            file: '',
+	            line: 0,
+	            column: 0,
+	        };
+	        if (file) {
+	            row.file = file[1];
+	            row.line = parseInt(file[2], 10) || 0;
+	            row.column = parseInt(file[3], 10) || 0;
+	        }
+	        return row;
+	    }
+	    return null;
+	}
+	function parseStack(stack) {
+	    if (stack == null) {
+	        return null;
+	    }
+	    var rows = stack.trim().split('\n');
+	    var list = [];
+	    for (var i = 0; i < rows.length; i++) {
+	        var row = parseStackRow(rows[i]);
+	        if (row !== null) {
+	            list.push(row);
+	        }
+	    }
+	    return list;
+	}
+
 	var R_VALUE = /:([^;]+)/g;
 	function createFormat(styles, format) {
 	    return function (entry) {
@@ -142,55 +187,56 @@
 	    ? function () { return performance.now(); }
 	    : Date.now;
 
-	var nativeAPI = {
-	    console: globalThis.console,
-	};
-	var timersList = [
-	    'Timeout',
-	    'Interval',
-	    'Immediate',
-	    'AnimationFrame',
-	];
-	function eachTimers(scope, iterator) {
-	    timersList.forEach(function (name) {
-	        var isRAF = name === 'AnimationFrame';
-	        var setName = "" + (isRAF ? 'request' : 'set') + name;
-	        var cancelName = "" + (isRAF ? 'cancel' : 'clear') + name;
-	        iterator(isRAF, setName, scope[setName], cancelName, scope[cancelName]);
-	    });
-	}
-	// Save origins
-	eachTimers(globalThis, function (_, setName, setFn, cancelName, cancelFn) {
-	    nativeAPI[setName] = setFn;
-	    nativeAPI[cancelName] = cancelFn;
+	var console = globalThis.console;
+	var setTimeout$1 = globalThis.setTimeout;
+	var clearTimeout = globalThis.clearTimeout;
+	var setInterval = globalThis.setInterval;
+	var clearInterval = globalThis.clearInterval;
+	var setImmediate = globalThis.setImmediate;
+	var clearImmediate = globalThis.clearImmediate;
+	var requestIdleCallback = globalThis.requestIdleCallback;
+	var cancelIdleCallback = globalThis.cancelIdleCallback;
+	var requestAnimationFrame = globalThis.requestAnimationFrame;
+	var cancelAnimationFrame = globalThis.cancelAnimationFrame;
+
+	var nativeAPI = /*#__PURE__*/Object.freeze({
+		console: console,
+		setTimeout: setTimeout$1,
+		clearTimeout: clearTimeout,
+		setInterval: setInterval,
+		clearInterval: clearInterval,
+		setImmediate: setImmediate,
+		clearImmediate: clearImmediate,
+		requestIdleCallback: requestIdleCallback,
+		cancelIdleCallback: cancelIdleCallback,
+		requestAnimationFrame: requestAnimationFrame,
+		cancelAnimationFrame: cancelAnimationFrame
 	});
 
-	var originalConsole = typeof console !== 'undefined' && console.log ? console : null;
-	var nodeOutput = function (console) {
-	    if (console === void 0) { console = originalConsole; }
+	var nodeOutput = function (options) {
+	    if (options === void 0) { options = {}; }
+	    var _a = options.out, out = _a === void 0 ? console : _a, _b = options.format, format = _b === void 0 ? nodeFromat : _b;
 	    return function (entry) {
 	        if (entry === null) {
 	            return;
 	        }
 	        var fn = LogLevelsInvert[entry.level === 6 ? LogLevels.info : entry.level];
-	        console[fn].apply(console, nodeFromat(entry));
+	        out[fn].apply(out, format(entry));
 	    };
 	};
-	var browserOutput = function (console) {
-	    if (console === void 0) { console = originalConsole; }
-	    var log = console.log.apply
-	        ? console.log
-	        : Function.prototype.bind.call(console.log, console);
-	    var groupSupproted = !!console.group;
-	    var groupEndSupproted = !!console.groupEnd;
-	    var groupCollapsedSupproted = !!console.groupCollapsed;
-	    var setTimeout = nativeAPI.setTimeout;
+	var browserOutput = function (options) {
+	    if (options === void 0) { options = {}; }
+	    var _a = options.out, out = _a === void 0 ? console : _a, _b = options.format, format = _b === void 0 ? browserFormat : _b;
+	    var log = out.log;
+	    var groupSupproted = !!out.group;
+	    var groupEndSupproted = !!out.groupEnd;
+	    var groupCollapsedSupproted = !!out.groupCollapsed;
 	    var debounced = {};
 	    var openScopes = [];
 	    function print(entry, skipPrinted) {
 	        if (entry === null) {
 	            openScopes.forEach(function () {
-	                console.groupEnd();
+	                out.groupEnd();
 	            });
 	            openScopes.length = 0;
 	            return;
@@ -208,7 +254,7 @@
 	                }
 	                else {
 	                    openScopes[idx].printed = true;
-	                    console.groupEnd();
+	                    out.groupEnd();
 	                }
 	            }
 	            openScopes.length = idx + 1;
@@ -216,18 +262,18 @@
 	        if (entry.type === EntryTypes.scope) {
 	            if (entry.detail.state === 'idle') {
 	                entry.printed = true;
-	                log.apply(console, browserFormat(entry));
+	                log.apply(out, format(entry));
 	            }
 	            else {
 	                openScopes.push(entry);
-	                console.group.apply(console, browserFormat(entry));
+	                out.group.apply(out, format(entry));
 	            }
 	        }
 	        else {
 	            if (!skipPrinted && parent.printed && parent.label !== '#root') {
-	                debounced[parent.cid] || (debounced[parent.cid] = setTimeout(function () {
+	                debounced[parent.cid] || (debounced[parent.cid] = setTimeout$1(function () {
 	                    openScopes.forEach(function () {
-	                        console.groupEnd();
+	                        out.groupEnd();
 	                    });
 	                    openScopes.length = 0;
 	                    var chain = [];
@@ -237,69 +283,24 @@
 	                        cursor = cursor.parent;
 	                    } while (cursor.label !== '#root');
 	                    chain.forEach(function (entry) {
-	                        console.group.apply(console, browserFormat(entry));
+	                        out.group.apply(out, format(entry));
 	                    });
 	                    parent.entries.forEach(function (entry) {
 	                        print(entry, true);
 	                    });
 	                    chain.forEach(function () {
-	                        console.groupEnd();
+	                        out.groupEnd();
 	                    });
 	                }));
 	                return;
 	            }
 	            entry.printed = true;
-	            log.apply(console, browserFormat(entry));
+	            log.apply(out, format(entry));
 	        }
 	    }
 	    return print;
 	};
-	var consoleOutput = typeof window !== 'undefined' ? browserOutput : nodeOutput;
-
-	var R_AT = /at\s+(?:([^\s]+)(?:.*?)\()?((?:http|file|\/)[^)]+:\d+)\)?/;
-	var R_EXTRACT_FILE1 = /^(.*?)(?:\/<)*@(.*?)$/;
-	var R_EXTRACT_FILE2 = /^()(https?:\/\/.+)/;
-	var R_FILE = /^(.*?):(\d+)(?::(\d+))?$/;
-	var ANONYMOUS = '<anonymous>';
-	function parseStackRow(value) {
-	    if (value == null) {
-	        return null;
-	    }
-	    var line = value.match(R_AT);
-	    if (line === null) {
-	        line = value.match(R_EXTRACT_FILE1) || value.match(R_EXTRACT_FILE2);
-	    }
-	    if (line) {
-	        var file = line[2].match(R_FILE);
-	        var row = {
-	            fn: line[1] === undefined ? ANONYMOUS : (line[1].trim() || ANONYMOUS),
-	            file: '',
-	            line: 0,
-	            column: 0,
-	        };
-	        if (file) {
-	            row.file = file[1];
-	            row.line = parseInt(file[2], 10) || 0;
-	            row.column = parseInt(file[3], 10) || 0;
-	        }
-	        return row;
-	    }
-	    return null;
-	}
-	function parseStack(stack) {
-	    if (stack == null) {
-	        return null;
-	    }
-	    var rows = stack.trim().split('\n');
-	    var list = [];
-	    for (var i = 0; i < rows.length; i++) {
-	        var row = parseStackRow(rows[i]);
-	        if (row !== null) {
-	            list.push(row);
-	        }
-	    }
-	    return list;
-	}
+	var universalOutput = typeof window !== 'undefined' ? browserOutput : nodeOutput;
 
 	var cid = 0;
 	function isLogEntry(x) {
@@ -406,7 +407,7 @@
 	}
 	function createLogger(options, factory) {
 	    if (options.silent == null) {
-	        options.silent = !/^(file:|https?:\/\/localhost\/)/.test(location + '');
+	        options.silent = !/^(about:|file:|https?:\/\/localhost\/)/.test(location + '');
 	    }
 	    if (options.meta == null) {
 	        options.meta = false;
@@ -532,7 +533,7 @@
 	};
 	var octologger = createLogger({
 	    meta: true,
-	    output: [consoleOutput()],
+	    output: [universalOutput()],
 	}, function (_a) {
 	    var levels = _a.levels, logger = _a.logger;
 	    return Object.keys(levels).reduce(function (api, level) {
@@ -592,7 +593,7 @@
 	}
 
 	var timers = {};
-	function createTimerTask(ctx, name, delay, callback, nativeCreate, isRAF, params) {
+	function createTimerTask(ctx, name, delay, callback, nativeCreate, isReq, params) {
 	    var start = now();
 	    var detail = {
 	        pid: null,
@@ -615,7 +616,7 @@
 	        var prevContext = switchLoggerContext(ctx, timerScope);
 	        var error;
 	        try {
-	            if (isRAF) {
+	            if (isReq) {
 	                callback(step);
 	            }
 	            else if (!callback.length || !params.length) {
@@ -652,7 +653,7 @@
 	        revertLoggerContext(prevContext);
 	    }, delay);
 	    detail.pid = pid;
-	    timers[pid] = {
+	    timers[name + ":" + pid] = {
 	        pid: pid,
 	        resolve: resolve,
 	        ctx: ctx,
@@ -660,18 +661,34 @@
 	    };
 	    return pid;
 	}
-	function cancelTimerTask(pid, nativeCancel) {
+	function cancelTimerTask(pid, name, nativeCancel) {
 	    nativeCancel(pid);
-	    if (timers[pid] === void 0) {
-	        var timer = timers[pid];
+	    var key = name + ":" + pid;
+	    var timer = timers[key];
+	    if (timer !== void 0) {
 	        var prevContext = switchLoggerContext(timer.ctx, timer.scope);
 	        timer.resolve(null, true);
 	        revertLoggerContext(prevContext);
-	        delete timers[pid];
+	        delete timers[key];
 	    }
 	}
 
-	function patchTimer(scope, isRAF, createName, nativeCreate, cancelName, nativeCancel) {
+	var timersList = [
+	    'Timeout',
+	    'Interval',
+	    'Immediate',
+	    'AnimationFrame',
+	    'IdleCallback',
+	];
+	function eachTimers(scope, iterator) {
+	    timersList.forEach(function (name) {
+	        var isReq = name === 'AnimationFrame' || name === 'IdleCallback';
+	        var setName = "" + (isReq ? 'request' : 'set') + name;
+	        var cancelName = "" + (isReq ? 'cancel' : 'clear') + name;
+	        iterator(isReq, setName, scope[setName], cancelName, scope[cancelName]);
+	    });
+	}
+	function patchTimer(scope, isReq, createName, nativeCreate, cancelName, nativeCancel) {
 	    scope[createName] = function (callback, delay) {
 	        if (delay === void 0) { delay = 0; }
 	        var params = [];
@@ -680,22 +697,22 @@
 	        }
 	        var ctx = getLoggerContext();
 	        if (ctx === null) {
-	            return isRAF
+	            return isReq
 	                ? nativeCreate(callback)
 	                : nativeCreate.apply(void 0, [callback, delay].concat(params));
 	        }
-	        return createTimerTask(ctx, createName, delay, callback, nativeCreate, isRAF, params);
+	        return createTimerTask(ctx, createName, delay, callback, nativeCreate, isReq, params);
 	    };
 	    scope[cancelName] = function (pid) {
-	        cancelTimerTask(pid, nativeCancel);
+	        cancelTimerTask(pid, createName, nativeCancel);
 	    };
 	    markAsNativeCode(scope, createName);
 	    markAsNativeCode(scope, cancelName);
 	}
 	function patchTimers(scope) {
-	    eachTimers(nativeAPI, function (isRAF, setName, setFn, cancelName, cancelFn) {
+	    eachTimers(nativeAPI, function (isReq, setName, setFn, cancelName, cancelFn) {
 	        if (scope[setName] === setFn) {
-	            patchTimer(scope, isRAF, setName, setFn, cancelName, cancelFn);
+	            patchTimer(scope, isReq, setName, setFn, cancelName, cancelFn);
 	        }
 	    });
 	}
@@ -733,14 +750,14 @@
 	exports.createFormat = createFormat;
 	exports.nodeFromat = nodeFromat;
 	exports.browserFormat = browserFormat;
-	exports.originalConsole = originalConsole;
 	exports.nodeOutput = nodeOutput;
 	exports.browserOutput = browserOutput;
-	exports.consoleOutput = consoleOutput;
+	exports.universalOutput = universalOutput;
 	exports.parseStackRow = parseStackRow;
 	exports.parseStack = parseStack;
 	exports.LogLevels = LogLevels;
 	exports.LogLevelsInvert = LogLevelsInvert;
+	exports.eachTimers = eachTimers;
 	exports.patchTimers = patchTimers;
 	exports.revertPatchTimers = revertPatchTimers;
 	exports.patchNativeAPI = patchNativeAPI;
