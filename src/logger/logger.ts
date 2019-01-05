@@ -1,5 +1,5 @@
 import { LogLevels, LogLevelTypes } from './levels';
-import { Entry, EntryTypes, ScopeEntry, LoggerOptions, LoggerAPI, LoggerEnv, Logger, EntryMeta, LoggerContext, LoggerScope, LoggerScopeContext } from './logger.types';
+import { Entry, EntryTypes, ScopeEntry, LoggerOptions, LoggerAPI, LoggerEnv, Logger, EntryMeta, LoggerContext, LoggerScope, LoggerScopeContext, ContextSnapshot } from './logger.types';
 import { parseStackRow } from '../stack/stack';
 import { universalOutput } from '../output/output';
 
@@ -120,14 +120,6 @@ let _activeContext: LoggerContext<any> = null;
 
 export function getLoggerContext(): LoggerContext<any> {
 	return _activeContext;
-}
-
-type ContextSnapshot = {
-	activeContext: LoggerContext<any>;
-	ctx: LoggerContext<any>;
-	scope: LoggerScope<any>;
-	scopeContext: LoggerScopeContext;
-	scopeContextParent: ScopeEntry;
 }
 
 export function switchLoggerContext(ctx: LoggerContext<any>, scope: LoggerScope<any>): ContextSnapshot {

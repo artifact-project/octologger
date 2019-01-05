@@ -390,20 +390,32 @@
 	        _activeContext = null;
 	        return;
 	    }
-	    var prev_context = _activeContext;
+	    var prev_activeContext = _activeContext;
 	    var prev_scope = ctx.scope;
+	    var prev_scopeContext = ctx.scopeContext;
+	    var prev_scopeContextParent;
 	    _activeContext = ctx;
 	    ctx.scope = scope;
 	    if (ctx.scopeContext) {
+	        prev_scopeContextParent = ctx.scopeContext.parent;
 	        ctx.scopeContext.parent = scope.scope();
 	    }
 	    return {
-	        context: prev_context,
+	        activeContext: prev_activeContext,
+	        ctx: ctx,
 	        scope: prev_scope,
+	        scopeContext: prev_scopeContext,
+	        scopeContextParent: prev_scopeContextParent,
 	    };
 	}
 	function revertLoggerContext(snapshot) {
-	    switchLoggerContext(snapshot.context, snapshot.scope);
+	    var ctx = snapshot.ctx, scopeContext = snapshot.scopeContext;
+	    ctx.scope = snapshot.scope;
+	    ctx.scopeContext = scopeContext;
+	    if (scopeContext) {
+	        scopeContext.parent = snapshot.scopeContextParent;
+	    }
+	    _activeContext = snapshot.activeContext;
 	}
 	function createLogger(options, factory) {
 	    if (options.silent == null) {

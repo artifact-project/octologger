@@ -100,3 +100,11 @@ export type LoggerScopeContext = {
 	parent: ScopeEntry;
 	logger?: CoreLogger;
 }
+
+export type ContextSnapshot = {
+	activeContext: LoggerContext<any>;
+	ctx: LoggerContext<any>;
+	scope: LoggerScope<any>;
+	scopeContext: LoggerScopeContext;
+	scopeContextParent: ScopeEntry;
+}
