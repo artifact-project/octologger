@@ -7,7 +7,9 @@ it('browser', () => {
 	const logger = createLogger({
 		output: [
 			browserOutput({
-				log: (...args: any[]) => log.push(args),
+				out: {
+					log: (...args: any[]) => log.push(args),
+				},
 			}),
 		]
 	}, ({logger}) => ({

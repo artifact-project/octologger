@@ -12,7 +12,7 @@ export function createTimerTask(
 	delay: number,
 	callback: Function,
 	nativeCreate: Function,
-	isRAF: boolean,
+	isReq: boolean,
 	params: any[] | null,
 ): number {
 	const start = now();
@@ -56,7 +56,7 @@ export function createTimerTask(
 		let error: Error;
 
 		try {
-			if (isRAF) {
+			if (isReq) {
 				callback(step);
 			} else if (!callback.length || !params.length) {
 				callback();
@@ -80,7 +80,7 @@ export function createTimerTask(
 	}, delay);
 
 	detail.pid = pid;
-	timers[pid] = {
+	timers[`${name}:${pid}`] = {
 		pid,
 		resolve,
 		ctx,
@@ -90,16 +90,18 @@ export function createTimerTask(
 	return pid;
 }
 
-export function cancelTimerTask(pid: number, nativeCancel: Function) {
+export function cancelTimerTask(pid: number, name: string, nativeCancel: Function) {
 	nativeCancel(pid);
 
-	if (timers[pid] === void 0) {
-		const timer = timers[pid];
+	const key = `${name}:${pid}`;
+	const timer = timers[key];
+
+	if (timer !== void 0) {
 		const prevContext = switchLoggerContext(timer.ctx, timer.scope);
 
 		timer.resolve(null, true);
 		revertLoggerContext(prevContext);
 
-		delete timers[pid];
+		delete timers[key];
 	}
 }

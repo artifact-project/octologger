@@ -1,48 +1,18 @@
 import { globalThis } from '../utils/utils';
 
-export const nativeAPI = {
-	console: globalThis.console,
-} as Pick<Window & {
-	setImmediate: (fn: () => void) => number;
-	cancelIdleCallback: (pid: number) => void;
-},
-	'setTimeout'
-	| 'clearTimeout'
-	| 'setInterval'
-	| 'clearInterval'
-	| 'setImmediate'
-	| 'requestAnimationFrame'
-	| 'console'
->;
+export const console = globalThis.console;
 
-const timersList = [
-	'Timeout',
-	'Interval',
-	'Immediate',
-	'AnimationFrame',
-];
+export const setTimeout = globalThis.setTimeout;
+export const clearTimeout = globalThis.clearTimeout;
 
-export function eachTimers(
-	scope: Partial<Window>,
-	iterator: (
-		isRAF: boolean,
-		setName: string,
-		setFn: Function,
-		cancelName: string,
-		cancelFn: (pid: number) => void,
-	) => void,
-) {
-	timersList.forEach(name => {
-		const isRAF = name === 'AnimationFrame';
-		const setName = `${isRAF ? 'request' : 'set'}${name}`;
-		const cancelName = `${isRAF ? 'cancel' : 'clear'}${name}`;
+export const setInterval = globalThis.setInterval;
+export const clearInterval = globalThis.clearInterval;
 
-		iterator(isRAF, setName, scope[setName], cancelName, scope[cancelName]);
-	});
-}
+export const setImmediate = globalThis.setImmediate;
+export const clearImmediate = globalThis.clearImmediate;
 
-// Save origins
-eachTimers(globalThis, (_, setName, setFn, cancelName, cancelFn) => {
-	nativeAPI[setName] = setFn;
-	nativeAPI[cancelName] = cancelFn;
-});
+export const requestIdleCallback = globalThis.requestIdleCallback;
+export const cancelIdleCallback = globalThis.cancelIdleCallback;
+
+export const requestAnimationFrame = globalThis.requestAnimationFrame;
+export const cancelAnimationFrame = globalThis.cancelAnimationFrame;

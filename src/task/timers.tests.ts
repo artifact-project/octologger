@@ -77,34 +77,20 @@ describe('setTimeout', () => {
 		expect(error).toBe(false);
 	});
 
-	it('cancelled', async function setTimeoutTest() {
-		let pid: any;
-		let error = false;
-		const scope = logger.scope('sleep', function scopeSleep() {
-			pid = setTimeout(function sleepCallback() {
-				error = true;
-			}, 2);
-		});
 
-		expect(scope.scope().entries.length).toEqual(1);
-		expect(scope.scope().entries[0].detail.state).toEqual('idle');
-
-		clearTimeout(pid);
-		expect(scope.scope().entries[0].detail.state).toEqual('cancelled');
-		expect(scope.scope().entries[0].entries[0].message).toEqual('Timer "setTimeout" cancelled');
-		expect(scope.scope().entries[0].entries[0].detail.cancelled).toEqual(true);
-
-		await pause(3);
-
-		expect(error).toBe(false);
-	});
-
-	it('failed', async function setTimeoutTest() {
+	it('error in callback (failed)', async function setTimeoutTest() {
+		let err = new Error('FAIL');
+		let consoleErr: Error;
 		const scope = logger.scope('sleep', function scopeSleep() {
 			setTimeout(function sleepCallback() {
-				throw new Error('FAIL');
+				throw err;
 			}, 2);
 		});
+
+		const originalConsoleErr = console.error;
+		console.error = (err: Error) => {
+			consoleErr = err;
+		};
 
 		expect(scope.scope().entries.length).toEqual(1);
 		expect(scope.scope().entries[0].detail.state).toEqual('idle');
@@ -113,7 +99,9 @@ describe('setTimeout', () => {
 
 		expect(scope.scope().entries[0].detail.state).toEqual('failed');
 		expect(scope.scope().entries[0].entries[0].message).toEqual('Timer "setTimeout" failed');
-		expect(scope.scope().entries[0].entries[0].detail.error + '').toEqual('Error: FAIL');
+		expect(scope.scope().entries[0].entries[0].detail.error).toBe(err);
 		expect(scope.scope().entries[0].entries[0].detail.cancelled).toEqual(false);
+		expect(consoleErr).toBe(err);
+		console.error = originalConsoleErr;
 	});
 });

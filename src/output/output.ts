@@ -1,24 +1,28 @@
 import { Format, nodeFromat, browserFormat } from '../format/format';
 import { LogLevelsInvert, LogLevels } from '../logger/levels';
 import { Entry, EntryTypes } from '../logger/logger.types';
-import { nativeAPI } from '../patcher/native';
+import { setTimeout, console } from '../patcher/native';
 
 export type Output = (entry: Entry) => void;
 
 export type OutputOptions = {
-	format: Format;
+	out?: Partial<Console>;
+	format?: Format;
 }
 
-export const originalConsole = typeof console !== 'undefined' && console.log ? console : null;
+export const nodeOutput = (options: OutputOptions = {}): Output => {
+	const {
+		out = console,
+		format = nodeFromat,
+	} = options;
 
-export const nodeOutput = (console: Console = originalConsole): Output => {
 	return (entry: Entry) => {
 		if (entry === null) {
 			return;
 		}
 
 		const fn = LogLevelsInvert[entry.level === 6 ? LogLevels.info : entry.level];
-		console[fn](...nodeFromat(entry));
+		out[fn](...format(entry));
 	};
 };
 
@@ -26,21 +30,20 @@ type OutputEntry = Entry & {
 	printed?: boolean;
 }
 
-export const browserOutput = (console: Partial<Console> = originalConsole): Output => {
-	const log = console.log.apply
-		? console.log
-		: Function.prototype.bind.call(console.log, console)
-	;
-	const groups = {};
-	const groupSupproted = !!console.group;
-	const groupEndSupproted = !!console.groupEnd;
-	const groupCollapsedSupproted = !!console.groupCollapsed;
+export const browserOutput = (options: OutputOptions = {}): Output => {
 	const {
-		setTimeout,
-	} = nativeAPI;
+		out = console,
+		format = browserFormat,
+	} = options;
+
+	const log = out.log;
+	const groups = {};
+	const groupSupproted = !!out.group;
+	const groupEndSupproted = !!out.groupEnd;
+	const groupCollapsedSupproted = !!out.groupCollapsed;
 
 	function printGroup(entry) {
-		console.group.apply(console, browserFormat(entry));
+		out.group.apply(out, browserFormat(entry));
 	}
 
 	const debounced = {};
@@ -49,7 +52,7 @@ export const browserOutput = (console: Partial<Console> = originalConsole): Outp
 	function print(entry: OutputEntry, skipPrinted?: boolean) {
 		if (entry === null) {
 			openScopes.forEach(() => {
-				console.groupEnd();
+				out.groupEnd();
 			});
 			openScopes.length = 0;
 			return;
@@ -70,7 +73,7 @@ export const browserOutput = (console: Partial<Console> = originalConsole): Outp
 					break;
 				} else {
 					openScopes[idx].printed = true;
-					console.groupEnd();
+					out.groupEnd();
 				}
 			}
 
@@ -80,16 +83,16 @@ export const browserOutput = (console: Partial<Console> = originalConsole): Outp
 		if (entry.type === EntryTypes.scope) {
 			if (entry.detail.state === 'idle') {
 				entry.printed = true;
-				log.apply(console, browserFormat(entry));
+				log.apply(out, format(entry));
 			} else {
 				openScopes.push(entry);
-				console.group.apply(console, browserFormat(entry));
+				out.group.apply(out, format(entry));
 			}
 		} else {
 			if (!skipPrinted && parent.printed && parent.label !== '#root') {
 				debounced[parent.cid] || (debounced[parent.cid] = setTimeout(() => {
 					openScopes.forEach(() => {
-						console.groupEnd();
+						out.groupEnd();
 					});
 					openScopes.length = 0;
 
@@ -102,7 +105,7 @@ export const browserOutput = (console: Partial<Console> = originalConsole): Outp
 					} while (cursor.label !== '#root');
 
 					chain.forEach(entry => {
-						console.group.apply(console, browserFormat(entry));
+						out.group.apply(out, format(entry));
 					});
 
 					parent.entries.forEach(entry => {
@@ -110,7 +113,7 @@ export const browserOutput = (console: Partial<Console> = originalConsole): Outp
 					})
 
 					chain.forEach(() => {
-						console.groupEnd()
+						out.groupEnd()
 					});
 				}));
 
@@ -118,7 +121,7 @@ export const browserOutput = (console: Partial<Console> = originalConsole): Outp
 			}
 
 			entry.printed = true;
-			log.apply(console, browserFormat(entry));
+			log.apply(out, format(entry));
 		}
 	};
 
@@ -126,4 +129,4 @@ export const browserOutput = (console: Partial<Console> = originalConsole): Outp
 };
 
 
-export const consoleOutput = typeof window !== 'undefined' ? browserOutput : nodeOutput;
+export const universalOutput = typeof window !== 'undefined' ? browserOutput : nodeOutput;

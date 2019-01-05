@@ -1,10 +1,37 @@
 import { createTimerTask, cancelTimerTask } from '../task/timers';
 import { getLoggerContext } from '../logger/logger';
-import { nativeAPI, eachTimers } from './native';
+import * as nativeAPI from './native';
+
+const timersList = [
+	'Timeout',
+	'Interval',
+	'Immediate',
+	'AnimationFrame',
+	'IdleCallback',
+];
+
+export function eachTimers(
+	scope: Partial<Window>,
+	iterator: (
+		isReq: boolean,
+		setName: string,
+		setFn: Function,
+		cancelName: string,
+		cancelFn: (pid: number) => void,
+	) => void,
+) {
+	timersList.forEach(name => {
+		const isReq = name === 'AnimationFrame' || name === 'IdleCallback';
+		const setName = `${isReq ? 'request' : 'set'}${name}`;
+		const cancelName = `${isReq ? 'cancel' : 'clear'}${name}`;
+
+		iterator(isReq, setName, scope[setName], cancelName, scope[cancelName]);
+	});
+}
 
 function patchTimer(
 	scope: Window,
-	isRAF: boolean,
+	isReq: boolean,
 	createName: string,
 	nativeCreate: Function,
 	cancelName: string,
@@ -14,7 +41,7 @@ function patchTimer(
 		const ctx = getLoggerContext();
 
 		if (ctx === null) {
-			return isRAF
+			return isReq
 				? nativeCreate(callback)
 				: nativeCreate(callback, delay, ...params)
 			;
@@ -26,7 +53,7 @@ function patchTimer(
 			delay,
 			callback,
 			nativeCreate,
-			isRAF,
+			isReq,
 			params,
 		);
 	};
@@ -34,6 +61,7 @@ function patchTimer(
 	scope[cancelName] = function (pid: number) {
 		cancelTimerTask(
 			pid,
+			createName,
 			nativeCancel,
 		);
 	};
@@ -43,9 +71,9 @@ function patchTimer(
 }
 
 export function patchTimers(scope: Window) {
-	eachTimers(nativeAPI, (isRAF, setName, setFn, cancelName, cancelFn) => {
+	eachTimers(nativeAPI, (isReq, setName, setFn, cancelName, cancelFn) => {
 		if (scope[setName] === setFn) {
-			patchTimer(scope, isRAF, setName, setFn, cancelName, cancelFn);
+			patchTimer(scope, isReq, setName, setFn, cancelName, cancelFn);
 		}
 	});
 }

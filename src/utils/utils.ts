@@ -1,4 +1,10 @@
-export const globalThis: Window = Function('return this')();
+export const globalThis = Function('return this')() as Window & {
+	setImmediate<P extends any[]>(fn: () => void, ...params: P): number;
+	clearImmediate(pid: number): void;
+
+	requestIdleCallback(fn: () => void, options?: {timeout: number}): number;
+	cancelIdleCallback(pid: number): void;
+};
 
 export function pause(ms: number) {
 	return new Promise(resolve => {

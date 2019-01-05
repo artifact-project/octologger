@@ -7,7 +7,7 @@
   "repository": "git@github.com:artifact-project/octologger.git",
   "main": "index.js",
   "scripts": {
-    "test": "jest --coverage",
+    "test": "jest",
     "ts-build": "tsc",
     "git-clean": "git clean -f",
     "installHooks": "cp ./.hooks/git/* ./.git/hooks/",

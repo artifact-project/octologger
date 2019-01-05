@@ -54,14 +54,14 @@ For logger from out of box.
 ### How to create custom logger?
 
 ```ts
-import { createLogger, consoleOutput, createLogEntry } from 'octologger'; // or import xlog, { octologger } from 'octologger';
+import { createLogger, universalOutput, createLogEntry } from 'octologger'; // or import xlog, { octologger } from 'octologger';
 
 // Create
 const xlog = createLogger(
 	// Options
 	{
 		meta: false,
-		output: [consoleOutput()],
+		output: [universalOutput()],
 	},
 
 	// Methods

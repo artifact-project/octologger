@@ -1,7 +1,7 @@
-import { consoleOutput } from '../output/output';
 import { LogLevels, LogLevelTypes } from './levels';
-import { Entry, EntryTypes, ScopeEntry, LoggerOptions, LoggerAPI, LoggerEnv, Logger, EntryMeta, CoreLogger, LoggerContext, LoggerScope, LoggerScopeContext } from './logger.types';
+import { Entry, EntryTypes, ScopeEntry, LoggerOptions, LoggerAPI, LoggerEnv, Logger, EntryMeta, LoggerContext, LoggerScope, LoggerScopeContext } from './logger.types';
 import { parseStackRow } from '../stack/stack';
+import { universalOutput } from '../output/output';
 
 let cid = 0;
 
@@ -153,7 +153,7 @@ export function createLogger<LA extends LoggerAPI>(
 	factory: (env: LoggerEnv) => LA,
 ): Logger<LA> {
 	if (options.silent == null) {
-		options.silent = !/^(file:|https?:\/\/localhost\/)/.test(location + '');
+		options.silent = !/^(about:|file:|https?:\/\/localhost\/)/.test(location + '');
 	}
 
 	if (options.meta == null) {
@@ -301,7 +301,7 @@ const BADGES: {[K in LogLevelTypes]?: string} = {
 
 const octologger = createLogger({
 	meta: true,
-	output: [consoleOutput()],
+	output: [universalOutput()],
 }, ({
 	levels,
 	logger,
