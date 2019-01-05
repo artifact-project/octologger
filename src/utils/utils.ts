@@ -1,6 +1,5 @@
 export const globalThis = Function('return this')() as Window & {
 	setImmediate(handler: (...args: any[]) => void, ...args: any[]): number;
-
 	clearImmediate(pid: number): void;
 
 	requestIdleCallback(fn: () => void, options?: {timeout: number}): number;

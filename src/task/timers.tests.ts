@@ -1,4 +1,4 @@
-import logger from '../logger/logger';
+import logger, { getLoggerContext } from '../logger/logger';
 import { globalThis, pause } from '../utils/utils';
 import { revertPatchTimers, patchTimers } from '../patcher/patcher';
 import { XError, parseError } from '../error/error';
@@ -19,6 +19,22 @@ it('native', () => {
 });
 
 describe('setTimeout', () => {
+	it('context and parent', async () => {
+		const parent = logger.add('before').parent;
+
+		expect(parent.label).toBe('#root');
+
+		logger.scope('sleep', function scopeSleep() {
+			setTimeout(() => {
+				logger.info('WOW!');
+			}, 1);
+		});
+
+		await pause(1);
+		expect(getLoggerContext()).toBe(null);
+		expect(logger.add('after').parent).toBe(parent);
+	});
+
 	it('successfully', async function setTimeoutTest() {
 		let pid: any;
 		let timerMeta: XError;

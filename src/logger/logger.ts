@@ -122,30 +122,56 @@ export function getLoggerContext(): LoggerContext<any> {
 	return _activeContext;
 }
 
-export function switchLoggerContext(ctx: LoggerContext<any>, scope: LoggerScope<any>) {
+type ContextSnapshot = {
+	activeContext: LoggerContext<any>;
+	ctx: LoggerContext<any>;
+	scope: LoggerScope<any>;
+	scopeContext: LoggerScopeContext;
+	scopeContextParent: ScopeEntry;
+}
+
+export function switchLoggerContext(ctx: LoggerContext<any>, scope: LoggerScope<any>): ContextSnapshot {
 	if (ctx === null) {
 		_activeContext = null;
 		return;
 	}
 
-	const prev_context = _activeContext;
+	const prev_activeContext = _activeContext;
 	const prev_scope = ctx.scope;
+	const prev_scopeContext = ctx.scopeContext;
+	let prev_scopeContextParent: ScopeEntry;
 
 	_activeContext = ctx;
 	ctx.scope = scope;
 
 	if (ctx.scopeContext) {
+		prev_scopeContextParent = ctx.scopeContext.parent;
 		ctx.scopeContext.parent = scope.scope();
 	}
 
 	return {
-		context: prev_context,
+		activeContext: prev_activeContext,
+		ctx,
 		scope: prev_scope,
+		scopeContext: prev_scopeContext,
+		scopeContextParent: prev_scopeContextParent,
 	};
 }
 
-export function revertLoggerContext(snapshot: {context: LoggerContext<any>, scope: LoggerScope<any>}) {
-	switchLoggerContext(snapshot.context, snapshot.scope);
+export function revertLoggerContext(snapshot: ContextSnapshot) {
+	const {
+		ctx,
+		scopeContext,
+	} = snapshot;
+
+	ctx.scope = snapshot.scope;
+	ctx.scopeContext = scopeContext;
+
+	if (scopeContext) {
+		scopeContext.parent = snapshot.scopeContextParent;
+	}
+
+	_activeContext = snapshot.activeContext;
 }
 
 export function createLogger<LA extends LoggerAPI>(
