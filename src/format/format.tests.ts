@@ -2,8 +2,11 @@ import { browserFormat as format } from './format';
 import { createLogger, createLogEntry } from '../logger/logger';
 import { LogLevels } from '../logger/levels';
 import { Entry } from '../logger/logger.types';
+import { timeFormat } from '../utils/utils';
 
-const logger = createLogger({}, ({logger}) => ({
+const logger = createLogger({
+	time: false,
+}, ({logger}) => ({
 	log: (entry: Entry) => logger.add(entry),
 }));
 

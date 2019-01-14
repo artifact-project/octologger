@@ -1,13 +1,14 @@
 import { now, globalThis } from '../utils/utils';
 import { getTaskLogLevel, getTaskLogDetail } from './task';
 import { switchLoggerContext, createLogEntry, revertLoggerContext, createScopeEntry, getMeta } from '../logger/logger';
-import { LoggerContext, STATE_IDLE, STATE_COMPLETED, STATE_CANCELLED, STATE_FAILED, STATE_INTERACTIVE, ProcessState } from '../logger/logger.types';
+import { LoggerContext, STATE_IDLE, STATE_COMPLETED, STATE_CANCELLED, STATE_FAILED, STATE_INTERACTIVE, ProcessState, LoggerScope } from '../logger/logger.types';
 import { LogLevels } from '../logger/levels';
 
 const timers = {} as {
 	[pid:string]: {
 		pid: string;
-		ctx: LoggerContext<any>
+		ctx: LoggerContext<any>;
+		scope: LoggerScope<any>;
 		resolve: (err: Error) => void;
 		detail: {
 			state: ProcessState;
@@ -112,11 +113,12 @@ export function createTimerTask(
 	}, delay);
 
 	detail.pid = pid;
-	timers[`${name}:${pid}`] = {
+	timers[getTimerKey(name, pid)] = {
 		pid,
 		resolve,
 		ctx,
 		detail: timerDetail,
+		scope: timerScope,
 	};
 
 	return pid;
@@ -125,11 +127,24 @@ export function createTimerTask(
 export function cancelTimerTask(pid: number, name: string, nativeCancel: Function) {
 	nativeCancel(pid);
 
-	const key = `${name}:${pid}`;
+	const key = getTimerKey(name, pid);
 	const timer = timers[key];
 
 	if (timer !== void 0) {
+		const prevContext = switchLoggerContext(timer.ctx, timer.scope);
+
 		timer.detail.state = STATE_CANCELLED;
+		timer.resolve(null);
+
+		revertLoggerContext(prevContext)
 		delete timers[key];
 	}
+}
+
+function getTimerKey(name: string, pid: number) {
+	return (
+		(name === 'setTimeout' || name === 'setInterval')
+			? 'timeout'
+			: name
+	) + pid;
 }

@@ -73,10 +73,10 @@ describe('setTimeout', () => {
 
 	it('cancelled', async function setTimeoutTest() {
 		let pid: any;
-		let error = false;
+		let notCancelled = false;
 		const scope = logger.scope('sleep', function scopeSleep() {
 			pid = setTimeout(function sleepCallback() {
-				error = true;
+				notCancelled = true;
 			}, 2);
 		});
 
@@ -90,7 +90,7 @@ describe('setTimeout', () => {
 
 		await pause(3);
 
-		expect(error).toBe(false);
+		expect(notCancelled).toBe(false);
 	});
 
 

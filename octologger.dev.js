@@ -167,8 +167,10 @@
 	}, function (_, entry, style) {
 	    var fmt = [];
 	    var args = [];
-	    fmt.push('%c[%s] ');
-	    args.push(style.base, timeFormat(entry.ts));
+	    if (entry.ts !== null) {
+	        fmt.push('%c[%s] ');
+	        args.push(style.base, timeFormat(entry.ts));
+	    }
 	    if (entry.badge !== null) {
 	        fmt.push('%s');
 	        args.push(entry.badge);
@@ -331,7 +333,7 @@
 	    if (meta === void 0) { meta = null; }
 	    return {
 	        cid: ++cid,
-	        ts: now(),
+	        ts: null,
 	        type: EntryTypes.entry,
 	        level: level,
 	        badge: badge,
@@ -369,6 +371,9 @@
 	            }
 	            if (options.meta && entry.meta === null) {
 	                entry.meta = getMeta(3);
+	            }
+	            if (options.time) {
+	                entry.ts = now();
 	            }
 	            var length = (entry.parent = parent).entries.push(entry);
 	            if (length > options.storeLast) {
@@ -443,6 +448,9 @@
 	function createLogger(options, factory) {
 	    if (options.silent == null) {
 	        options.silent = !/^(about:|file:|https?:\/\/localhost\/)/.test(location + '');
+	    }
+	    if (options.time == null) {
+	        options.time = true;
 	    }
 	    if (options.meta == null) {
 	        options.meta = false;
@@ -704,22 +712,31 @@
 	        revertLoggerContext(prevContext);
 	    }, delay);
 	    detail.pid = pid;
-	    timers[name + ":" + pid] = {
+	    timers[getTimerKey(name, pid)] = {
 	        pid: pid,
 	        resolve: resolve,
 	        ctx: ctx,
 	        detail: timerDetail,
+	        scope: timerScope,
 	    };
 	    return pid;
 	}
 	function cancelTimerTask(pid, name, nativeCancel) {
 	    nativeCancel(pid);
-	    var key = name + ":" + pid;
+	    var key = getTimerKey(name, pid);
 	    var timer = timers[key];
 	    if (timer !== void 0) {
+	        var prevContext = switchLoggerContext(timer.ctx, timer.scope);
 	        timer.detail.state = STATE_CANCELLED;
+	        timer.resolve(null);
+	        revertLoggerContext(prevContext);
 	        delete timers[key];
 	    }
+	}
+	function getTimerKey(name, pid) {
+	    return ((name === 'setTimeout' || name === 'setInterval')
+	        ? 'timeout'
+	        : name) + pid;
 	}
 
 	var timersList = [

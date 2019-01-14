@@ -20,7 +20,7 @@ export function createLogEntry(
 ): Entry {
 	return {
 		cid: ++cid,
-		ts: now(),
+		ts: null,
 		type: EntryTypes.entry,
 		level,
 		badge,
@@ -72,6 +72,10 @@ function createCoreLogger(options: Partial<LoggerOptions>, ctx: LoggerScopeConte
 
 			if (options.meta && entry.meta === null) {
 				entry.meta = getMeta(3);
+			}
+
+			if (options.time) {
+				entry.ts = now();
 			}
 
 			const length = (entry.parent = parent).entries.push(entry);
@@ -175,6 +179,10 @@ export function createLogger<LA extends LoggerAPI>(
 ): Logger<LA> {
 	if (options.silent == null) {
 		options.silent = !/^(about:|file:|https?:\/\/localhost\/)/.test(location + '');
+	}
+
+	if (options.time == null) {
+		options.time = true;
 	}
 
 	if (options.meta == null) {

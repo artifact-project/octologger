@@ -124,8 +124,10 @@ export const browserFormat = createFormat(
 		const fmt = [];
 		const args = [];
 
-		fmt.push('%c[%s] ');
-		args.push(style.base, timeFormat(entry.ts));
+		if (entry.ts !== null) {
+			fmt.push('%c[%s] ');
+			args.push(style.base, timeFormat(entry.ts));
+		}
 
 		if (entry.badge !== null) {
 			fmt.push('%s');

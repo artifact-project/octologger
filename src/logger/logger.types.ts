@@ -17,6 +17,7 @@ export type LoggerAPI = {
 
 export type LoggerOptions = {
 	meta: boolean;
+	time: boolean;
 	levels: LogLevel[];
 	silent: boolean;
 	storeLast: number;

@@ -28,6 +28,7 @@ For logger from out of box.
 #### core
 - **setup**(options: `LoggerOptions`): `void`
   - meta: `boolean`
+  - time: `boolean`
   - silent: `boolean`
   - output: `Output[]`
 - **scope**(name: `string`): `ScopeEntry`
