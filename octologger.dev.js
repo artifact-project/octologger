@@ -7,10 +7,15 @@
 	var EntryTypes = {
 	    entry: 0,
 	    scope: 1,
-	    group: 2,
-	    timeMark: 3,
-	    timeMeasure: 4,
 	};
+	var STATE_IDLE = 'idle';
+	var STATE_BUSY = 'BUSY';
+	var STATE_INTERACTIVE = 'interactive';
+	var STATE_PENDING = 'pending';
+	var STATE_COMPLETED = 'completed';
+	var STATE_ABORTED = 'ABORTED';
+	var STATE_CANCELLED = 'cancelled';
+	var STATE_FAILED = 'failed';
 
 	var LogLevels = {
 	    error: 0,
@@ -71,6 +76,22 @@
 	    return list;
 	}
 
+	var globalThis = Function('return this')();
+	var now = typeof performance !== 'undefined' && performance.now
+	    ? function () { return performance.now(); }
+	    : Date.now;
+	function zeroPad(n, min) {
+	    var val = n < 10 ? '0' + n : n;
+	    if (min > 1 && n < 100) {
+	        val = "0" + val;
+	    }
+	    return val;
+	}
+	function timeFormat(ts) {
+	    var sec = ts / 1000;
+	    return zeroPad(sec / 60 % 24 | 0) + ":" + zeroPad(sec % 60 | 0) + "." + zeroPad(ts % 1000 | 0, 2);
+	}
+
 	var R_VALUE = /:([^;]+)/g;
 	function createFormat(styles, format) {
 	    return function (entry) {
@@ -99,7 +120,6 @@
 	        success: '\x1b[4m',
 	        verbose: '\x1b[4m',
 	        debug: '\x1b[4m',
-	        silly: '\x1b[4m',
 	    },
 	}, function (_, entry, style) {
 	    var args = [];
@@ -122,6 +142,9 @@
 	    return args;
 	});
 	var LABEL_STYLE = 'text-decoration: underline; font-weight: bold;';
+	function resetFormatStyle(val) {
+	    return val.replace(R_VALUE, ': inherit');
+	}
 	var browserFormat = createFormat({
 	    level: {
 	        error: 'color: red;',
@@ -140,18 +163,19 @@
 	        success: LABEL_STYLE,
 	        verbose: LABEL_STYLE,
 	        debug: LABEL_STYLE,
-	        silly: LABEL_STYLE,
 	    },
 	}, function (_, entry, style) {
 	    var fmt = [];
 	    var args = [];
+	    fmt.push('%c[%s] ');
+	    args.push(style.base, timeFormat(entry.ts));
 	    if (entry.badge !== null) {
 	        fmt.push('%s');
 	        args.push(entry.badge);
 	    }
 	    if (entry.label !== null) {
 	        fmt.push('%c%s%c ');
-	        args.push(style.label + style.base, entry.label, style.label.replace(R_VALUE, ': inherit'));
+	        args.push(style.label + style.base, entry.label, resetFormatStyle(style.label));
 	    }
 	    if (entry.message !== null) {
 	        fmt.push('%c%s ');
@@ -182,11 +206,6 @@
 	    return args;
 	});
 
-	var globalThis = Function('return this')();
-	var now = typeof performance !== 'undefined' && performance.now
-	    ? function () { return performance.now(); }
-	    : Date.now;
-
 	var console = globalThis.console;
 	var setTimeout$1 = globalThis.setTimeout;
 	var clearTimeout = globalThis.clearTimeout;
@@ -198,6 +217,7 @@
 	var cancelIdleCallback = globalThis.cancelIdleCallback;
 	var requestAnimationFrame = globalThis.requestAnimationFrame;
 	var cancelAnimationFrame = globalThis.cancelAnimationFrame;
+	var Promise$1 = globalThis.Promise;
 
 	var nativeAPI = /*#__PURE__*/Object.freeze({
 		console: console,
@@ -210,7 +230,8 @@
 		requestIdleCallback: requestIdleCallback,
 		cancelIdleCallback: cancelIdleCallback,
 		requestAnimationFrame: requestAnimationFrame,
-		cancelAnimationFrame: cancelAnimationFrame
+		cancelAnimationFrame: cancelAnimationFrame,
+		Promise: Promise$1
 	});
 
 	var nodeOutput = function (options) {
@@ -310,6 +331,7 @@
 	    if (meta === void 0) { meta = null; }
 	    return {
 	        cid: ++cid,
+	        ts: now(),
 	        type: EntryTypes.entry,
 	        level: level,
 	        badge: badge,
@@ -367,6 +389,7 @@
 	    if (state === void 0) { state = null; }
 	    return {
 	        cid: ++cid,
+	        ts: now(),
 	        level: level,
 	        type: EntryTypes.scope,
 	        badge: badge,
@@ -446,7 +469,7 @@
 	        }
 	    };
 	    var api = factory({
-	        setup: setup,
+	        createLogEntry: createLogEntry,
 	        levels: LogLevels,
 	        logger: logger,
 	    });
@@ -500,7 +523,7 @@
 	        _activeScopeContext.logger.add(scopeEntry);
 	        var logger = createCoreLogger(options, { parent: scopeEntry });
 	        var scopeAPI = factory({
-	            setup: setup,
+	            createLogEntry: createLogEntry,
 	            levels: LogLevels,
 	            logger: logger,
 	        });
@@ -606,27 +629,43 @@
 
 	var timers = {};
 	function createTimerTask(ctx, name, delay, callback, nativeCreate, isReq, params) {
+	    var looped = name === 'setInterval' || isReq;
 	    var start = now();
 	    var detail = {
 	        pid: null,
 	        start: start,
+	        end: null,
 	        delay: delay,
 	    };
 	    var meta = ctx.options.meta ? getMeta(3) : null;
-	    var timerScope = ctx.scope.scope(createScopeEntry(LogLevels.verbose, '⏲', null, "Timer \"" + name + "\" started", detail, meta, 'idle'));
-	    var resolve = function (error, cancelled) {
+	    var timerScope = ctx.scope.scope(createScopeEntry(LogLevels.verbose, '⏲', null, "Timer \"" + name + "\" started", detail, meta, STATE_IDLE));
+	    var timerDetail = timerScope.scope().detail;
+	    var resolve = function (error) {
+	        var cancelled = timerDetail.state === STATE_CANCELLED;
 	        var level = getTaskLogLevel(error, cancelled);
 	        var logLevel = getTaskLogDetail(level);
-	        timerScope.scope().detail.state = level === 0 ? 'completed' : (level === 1 ? 'cancelled' : 'failed');
-	        ctx.scopeContext.logger.add(createLogEntry(logLevel.level, logLevel.badge, logLevel.label, "Timer \"" + name + "\" " + (level === 0 ? 'completed successfully' : (level === 1 ? 'cancelled' : 'failed')), {
+	        var end = now();
+	        timerDetail.state = level === 0
+	            ? (looped ? STATE_IDLE : STATE_COMPLETED)
+	            : (level === 1 ? STATE_CANCELLED : STATE_FAILED);
+	        timerDetail.info.end = end;
+	        ctx.scopeContext.logger.add(createLogEntry(logLevel.level, logLevel.badge, logLevel.label, "Timer \"" + name + "\"" + (looped
+	            ? ' step'
+	            : '') + " " + (level === 0
+	            ? 'completed successfully'
+	            : (level === 1 ? STATE_CANCELLED : STATE_FAILED)), {
 	            error: error,
 	            cancelled: cancelled,
-	            duration: now() - start,
+	            start: start,
+	            duration: end - start,
 	        }, meta));
+	        start = end;
 	    };
 	    var pid = nativeCreate(function (step) {
 	        var prevContext = switchLoggerContext(ctx, timerScope);
-	        var error;
+	        var error = null;
+	        start = now();
+	        timerDetail.state = STATE_INTERACTIVE;
 	        try {
 	            if (isReq) {
 	                callback(step);
@@ -661,7 +700,7 @@
 	            error = err;
 	            globalThis.console.error(err);
 	        }
-	        resolve(error, false);
+	        resolve(error);
 	        revertLoggerContext(prevContext);
 	    }, delay);
 	    detail.pid = pid;
@@ -669,7 +708,7 @@
 	        pid: pid,
 	        resolve: resolve,
 	        ctx: ctx,
-	        scope: timerScope,
+	        detail: timerDetail,
 	    };
 	    return pid;
 	}
@@ -678,9 +717,7 @@
 	    var key = name + ":" + pid;
 	    var timer = timers[key];
 	    if (timer !== void 0) {
-	        var prevContext = switchLoggerContext(timer.ctx, timer.scope);
-	        timer.resolve(null, true);
-	        revertLoggerContext(prevContext);
+	        timer.detail.state = STATE_CANCELLED;
 	        delete timers[key];
 	    }
 	}
@@ -748,6 +785,14 @@
 	}
 
 	exports.EntryTypes = EntryTypes;
+	exports.STATE_IDLE = STATE_IDLE;
+	exports.STATE_BUSY = STATE_BUSY;
+	exports.STATE_INTERACTIVE = STATE_INTERACTIVE;
+	exports.STATE_PENDING = STATE_PENDING;
+	exports.STATE_COMPLETED = STATE_COMPLETED;
+	exports.STATE_ABORTED = STATE_ABORTED;
+	exports.STATE_CANCELLED = STATE_CANCELLED;
+	exports.STATE_FAILED = STATE_FAILED;
 	exports.isLogEntry = isLogEntry;
 	exports.createLogEntry = createLogEntry;
 	exports.getMeta = getMeta;
@@ -761,6 +806,7 @@
 	exports.parseError = parseError;
 	exports.createFormat = createFormat;
 	exports.nodeFromat = nodeFromat;
+	exports.resetFormatStyle = resetFormatStyle;
 	exports.browserFormat = browserFormat;
 	exports.nodeOutput = nodeOutput;
 	exports.browserOutput = browserOutput;

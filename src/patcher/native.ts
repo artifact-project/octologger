@@ -16,3 +16,5 @@ export const cancelIdleCallback = globalThis.cancelIdleCallback;
 
 export const requestAnimationFrame = globalThis.requestAnimationFrame;
 export const cancelAnimationFrame = globalThis.cancelAnimationFrame;
+
+export const Promise = globalThis.Promise;

@@ -1,7 +1,8 @@
-import { LogLevels, LogLevelTypes } from './levels';
+import { LogLevels, LogLevel } from './levels';
 import { Entry, EntryTypes, ScopeEntry, LoggerOptions, LoggerAPI, LoggerEnv, Logger, EntryMeta, LoggerContext, LoggerScope, LoggerScopeContext, ContextSnapshot } from './logger.types';
 import { parseStackRow } from '../stack/stack';
 import { universalOutput } from '../output/output';
+import { now } from '../utils/utils';
 
 let cid = 0;
 
@@ -19,6 +20,7 @@ export function createLogEntry(
 ): Entry {
 	return {
 		cid: ++cid,
+		ts: now(),
 		type: EntryTypes.entry,
 		level,
 		badge,
@@ -101,6 +103,7 @@ export function createScopeEntry(
 ): ScopeEntry {
 	return {
 		cid: ++cid,
+		ts: now(),
 		level: level,
 		type: EntryTypes.scope,
 		badge,
@@ -205,7 +208,7 @@ export function createLogger<LA extends LoggerAPI>(
 	};
 
 	const api = factory({
-		setup,
+		createLogEntry,
 		levels: LogLevels,
 		logger,
 	});
@@ -269,7 +272,7 @@ export function createLogger<LA extends LoggerAPI>(
 
 		const logger = createCoreLogger(options, {parent: scopeEntry});
 		const scopeAPI = factory({
-			setup,
+			createLogEntry,
 			levels: LogLevels,
 			logger,
 		});
@@ -308,7 +311,7 @@ export function createLogger<LA extends LoggerAPI>(
 	return api as Logger<LA>;
 }
 
-const BADGES: {[K in LogLevelTypes]?: string} = {
+const BADGES: {[K in LogLevel]?: string} = {
 	info: '❕',
 	warn: '⚠️',
 	error: '🛑',

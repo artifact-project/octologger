@@ -1,11 +1,12 @@
 import { Entry } from '../logger/logger.types';
-import { LogLevelTypes, LogLevelsInvert } from '../logger/levels';
+import { LogLevel, LogLevelsInvert } from '../logger/levels';
+import { timeFormat } from '../utils/utils';
 
 const R_VALUE = /:([^;]+)/g;
 
 export type LogStyle = {
 	level: {
-		[K in LogLevelTypes]: string;
+		[K in LogLevel]: string;
 	};
 
 	label: {
@@ -22,10 +23,10 @@ export type Format = (entry: Entry) => any[];
 
 export function createFormat(
 	styles: LogStyle,
-	format: (level: LogLevelTypes, entry: Entry, colors: StyleByLevel) => string[],
+	format: (level: LogLevel, entry: Entry, colors: StyleByLevel) => string[],
 ): Format {
 	return (entry: Entry) => {
-		const level = LogLevelsInvert[entry.level] as LogLevelTypes;
+		const level = LogLevelsInvert[entry.level] as LogLevel;
 
 		return format(
 			level,
@@ -58,7 +59,6 @@ export const nodeFromat = createFormat(
 			success: '\x1b[4m',
 			verbose: '\x1b[4m',
 			debug: '\x1b[4m',
-			silly: '\x1b[4m',
 		},
 	},
 
@@ -93,6 +93,10 @@ export const nodeFromat = createFormat(
 
 const LABEL_STYLE = 'text-decoration: underline; font-weight: bold;';
 
+export function resetFormatStyle(val: string) {
+	return val.replace(R_VALUE, ': inherit');
+}
+
 export const browserFormat = createFormat(
 	{
 		level: {
@@ -113,13 +117,15 @@ export const browserFormat = createFormat(
 			success: LABEL_STYLE,
 			verbose: LABEL_STYLE,
 			debug: LABEL_STYLE,
-			silly: LABEL_STYLE,
 		},
 	},
 
 	(_, entry, style) => {
 		const fmt = [];
 		const args = [];
+
+		fmt.push('%c[%s] ');
+		args.push(style.base, timeFormat(entry.ts));
 
 		if (entry.badge !== null) {
 			fmt.push('%s');
@@ -128,7 +134,7 @@ export const browserFormat = createFormat(
 
 		if (entry.label !== null) {
 			fmt.push('%c%s%c ');
-			args.push(style.label + style.base, entry.label, style.label.replace(R_VALUE, ': inherit'));
+			args.push(style.label + style.base, entry.label, resetFormatStyle(style.label));
 		}
 
 		if (entry.message !== null) {

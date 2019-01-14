@@ -16,4 +16,4 @@ for (let key in LogLevels) {
 	LogLevelsInvert[LogLevels[key]] = key;
 }
 
-export type LogLevelTypes = keyof (typeof LogLevels);
+export type LogLevel = keyof (typeof LogLevels);

@@ -1,7 +1,7 @@
 <html>
 <head>
 	<meta charset="utf-8"/>
-	<title>OctoLogger: Example</title>
+	<title>OctoLogger :: Example</title>
 	<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/css/bootstrap.min.css" integrity="sha384-MCw98/SFnGE8fJT3GXwEOngsV7Zt27NXFoaoApmYm81iuXoPkFOJwJ8ERdknLPMO" crossorigin="anonymous"/>
 	<script src="./octologger.dev.js"></script>
 </head>
@@ -18,7 +18,10 @@
 
 	<script>
 		octologger.patchNativeAPI(window);
-		octologger.logger.setup({silent: false, meta: !false});
+		octologger.logger.setup({
+			silent: false,
+			meta: !false,
+		});
 
 		(function main(logger) {
 			logger.scope('Session', {started: new Date().toISOString()}, () => {

@@ -1,12 +1,9 @@
 import { Output } from '../output/output';
-import { LogLevels } from './levels';
+import { LogLevels, LogLevel } from './levels';
 
 export const EntryTypes = {
 	entry: 0,
 	scope: 1,
-	group: 2,
-	timeMark: 3,
-	timeMeasure: 4,
 }
 
 export type CoreLogger = {
@@ -20,19 +17,28 @@ export type LoggerAPI = {
 
 export type LoggerOptions = {
 	meta: boolean;
+	levels: LogLevel[];
 	silent: boolean;
 	storeLast: number;
 	output: Output[];
 }
 
 export type LoggerEnv = {
-	setup: (optionsPatch: Partial<LoggerOptions>) => void;
 	levels: typeof LogLevels;
 	logger: CoreLogger;
+	createLogEntry: (
+		level: Entry['level'],
+		badge: Entry['badge'],
+		label: Entry['label'],
+		message: Entry['message'],
+		detail: Entry['detail'],
+		meta: EntryMeta,
+	) => Entry;
 }
 
 export interface Entry {
 	cid: number;
+	ts: number;
 	type: number;
 	badge: string;
 	level: number;
@@ -51,10 +57,28 @@ export type EntryMeta = {
 	column: number;
 }
 
+export const STATE_IDLE = 'idle';
+export const STATE_BUSY = 'BUSY';
+export const STATE_INTERACTIVE = 'interactive';
+export const STATE_PENDING = 'pending';
+export const STATE_COMPLETED = 'completed';
+export const STATE_ABORTED = 'ABORTED';
+export const STATE_CANCELLED = 'cancelled';
+export const STATE_FAILED = 'failed';
+
+export type ProcessState = typeof STATE_IDLE
+	| typeof STATE_BUSY
+	| typeof STATE_INTERACTIVE
+	| typeof STATE_PENDING
+	| typeof STATE_COMPLETED
+	| typeof STATE_ABORTED
+	| typeof STATE_CANCELLED
+	| typeof STATE_FAILED
+
 export interface ScopeEntry extends Entry {
 	detail: {
 		info: any;
-		state: 'idle' | 'pending' | 'completed' | 'cancelled' | 'failed';
+		state: ProcessState;
 	};
 }
 
@@ -79,7 +103,7 @@ export type LoggerScope<LA extends LoggerAPI> = {
 }
 
 export type Logger<LA extends LoggerAPI> = LoggerScope<LA> & {
-	setup: LoggerEnv['setup'];
+	setup: (optionsPatch: Partial<LoggerOptions>) => void;
 	add(...args: any[]): Entry;
 	print(): void;
 	clear(): Entry[];
