@@ -4,9 +4,9 @@ import { LogLevels } from './levels';
 
 
 beforeEach(() => {
-	logger.setup({output: []});
+	logger.setup({output: [], meta: true});
 	logger.clear();
-})
+});
 
 it('scope: base', () => {
 	const scope = logger.scope('foo');

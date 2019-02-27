@@ -1,6 +1,8 @@
 import { createTimerTask, cancelTimerTask } from '../task/timers';
 import { getLoggerContext } from '../logger/logger';
 import * as nativeAPI from './native';
+import { markAsNativeCode } from '../utils/utils';
+import { ScopedPromise } from '../task/promise';
 
 const timersList = [
 	'Timeout',
@@ -85,17 +87,25 @@ export function revertPatchTimers(scope: Window) {
 	});
 }
 
+export function patchPromise(scope: Window) {
+	// scope['Promise'] = ScopedPromise;
+}
+
+export function revertPatchPromise(scope: Window) {
+	// const NativePromise: any = nativeAPI.NativePromise;
+
+	// NativePromise.prototype = nativeAPI.PromisePrototype;
+	// NativePromise.prototype = nativeAPI.PromisePrototype;
+
+	// scope['Promise'] = NativePromise;
+}
+
 export function patchNativeAPI(scope: Window) {
 	patchTimers(scope);
+	patchPromise(scope);
 }
 
 export function revertPatchNativeAPI(scope: Window) {
 	revertPatchTimers(scope);
-}
-
-function markAsNativeCode(scope: Window, method: string) {
-	scope[method].toString = function () {
-		return `function ${method}() { [native code] }`;
-	};
-	scope[method].native = nativeAPI[method];
+	revertPatchPromise(scope);
 }

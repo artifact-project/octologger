@@ -39,7 +39,7 @@ export function getMeta(offset: number = 0): EntryMeta {
 	Error.stackTraceLimit = offset + 1;
 
 	const error = new Error();
-	const stack = error.stack.split('\n');
+	const stack = (error.stack || '').split('\n');
 
 	Error.stackTraceLimit = stackTraceLimit;
 
@@ -329,7 +329,7 @@ const BADGES: {[K in LogLevel]?: string} = {
 };
 
 const octologger = createLogger({
-	meta: true,
+	meta: false,
 	output: [universalOutput()],
 }, ({
 	levels,

@@ -8,6 +8,7 @@
 	    entry: 0,
 	    scope: 1,
 	};
+	var STATE_OK = 'ok';
 	var STATE_IDLE = 'idle';
 	var STATE_BUSY = 'BUSY';
 	var STATE_INTERACTIVE = 'interactive';
@@ -16,6 +17,9 @@
 	var STATE_ABORTED = 'ABORTED';
 	var STATE_CANCELLED = 'cancelled';
 	var STATE_FAILED = 'failed';
+	var STATE_ERROR = 'error';
+	var STATE_RESOLVED = 'resolved';
+	var STATE_REJECTED = 'rejected';
 
 	var LogLevels = {
 	    error: 0,
@@ -90,6 +94,11 @@
 	function timeFormat(ts) {
 	    var sec = ts / 1000;
 	    return zeroPad(sec / 60 % 24 | 0) + ":" + zeroPad(sec % 60 | 0) + "." + zeroPad(ts % 1000 | 0, 2);
+	}
+	function markAsNativeCode(scope, method) {
+	    scope[method].toString = function () {
+	        return "function " + method + "() { [native code] }";
+	    };
 	}
 
 	var R_VALUE = /:([^;]+)/g;
@@ -219,7 +228,17 @@
 	var cancelIdleCallback = globalThis.cancelIdleCallback;
 	var requestAnimationFrame = globalThis.requestAnimationFrame;
 	var cancelAnimationFrame = globalThis.cancelAnimationFrame;
-	var Promise$1 = globalThis.Promise;
+	var NativePromise = globalThis.Promise;
+	var NativePromisePrototype = NativePromise.prototype;
+	var PromiseConstructor = NativePromise;
+	var PromiseStatic = {};
+	var PromisePrototype = {};
+	['all', 'race', 'reject', 'resolve'].forEach(function (key) {
+	    PromiseStatic[key] = NativePromise[key];
+	});
+	['then', 'catch', 'finally'].forEach(function (key) {
+	    PromisePrototype[key] = NativePromisePrototype[key];
+	});
 
 	var nativeAPI = /*#__PURE__*/Object.freeze({
 		console: console,
@@ -233,7 +252,10 @@
 		cancelIdleCallback: cancelIdleCallback,
 		requestAnimationFrame: requestAnimationFrame,
 		cancelAnimationFrame: cancelAnimationFrame,
-		Promise: Promise$1
+		NativePromise: NativePromise,
+		PromiseConstructor: PromiseConstructor,
+		PromiseStatic: PromiseStatic,
+		PromisePrototype: PromisePrototype
 	});
 
 	var nodeOutput = function (options) {
@@ -350,7 +372,7 @@
 	    var stackTraceLimit = Error.stackTraceLimit;
 	    Error.stackTraceLimit = offset + 1;
 	    var error = new Error();
-	    var stack = error.stack.split('\n');
+	    var stack = (error.stack || '').split('\n');
 	    Error.stackTraceLimit = stackTraceLimit;
 	    if (stack.length <= offset + 1) {
 	        return null;
@@ -575,7 +597,7 @@
 	    success: '✅',
 	};
 	var octologger = createLogger({
-	    meta: true,
+	    meta: false,
 	    output: [universalOutput()],
 	}, function (_a) {
 	    var levels = _a.levels, logger = _a.logger;
@@ -611,22 +633,25 @@
 	    };
 	}
 
+	var TASK_SUCCESS = {
+	    level: LogLevels.info,
+	    badge: null,
+	    label: 'success',
+	};
+	var TASK_WARN = {
+	    level: LogLevels.warn,
+	    badge: '⚠️',
+	    label: 'cancelled',
+	};
+	var TASK_ERROR = {
+	    level: LogLevels.error,
+	    badge: '❌',
+	    label: 'failed',
+	};
 	var taskLogDetail = {
-	    0: {
-	        level: LogLevels.info,
-	        badge: null,
-	        label: 'success',
-	    },
-	    1: {
-	        level: LogLevels.warn,
-	        badge: '⚠️',
-	        label: 'cancelled',
-	    },
-	    2: {
-	        level: LogLevels.error,
-	        badge: '❌',
-	        label: 'failed',
-	    },
+	    0: TASK_SUCCESS,
+	    1: TASK_WARN,
+	    2: TASK_ERROR,
 	};
 	function getTaskLogLevel(error, cancelled) {
 	    return (+cancelled + +(error != null) * 2);
@@ -788,20 +813,24 @@
 	        scope[cancelName] = cancelFn;
 	    });
 	}
+	function patchPromise(scope) {
+	    // scope['Promise'] = ScopedPromise;
+	}
+	function revertPatchPromise(scope) {
+	    // const NativePromise: any = nativeAPI.NativePromise;
+	    // NativePromise.prototype = nativeAPI.PromisePrototype;
+	    // NativePromise.prototype = nativeAPI.PromisePrototype;
+	    // scope['Promise'] = NativePromise;
+	}
 	function patchNativeAPI(scope) {
 	    patchTimers(scope);
 	}
 	function revertPatchNativeAPI(scope) {
 	    revertPatchTimers(scope);
 	}
-	function markAsNativeCode(scope, method) {
-	    scope[method].toString = function () {
-	        return "function " + method + "() { [native code] }";
-	    };
-	    scope[method].native = nativeAPI[method];
-	}
 
 	exports.EntryTypes = EntryTypes;
+	exports.STATE_OK = STATE_OK;
 	exports.STATE_IDLE = STATE_IDLE;
 	exports.STATE_BUSY = STATE_BUSY;
 	exports.STATE_INTERACTIVE = STATE_INTERACTIVE;
@@ -810,6 +839,9 @@
 	exports.STATE_ABORTED = STATE_ABORTED;
 	exports.STATE_CANCELLED = STATE_CANCELLED;
 	exports.STATE_FAILED = STATE_FAILED;
+	exports.STATE_ERROR = STATE_ERROR;
+	exports.STATE_RESOLVED = STATE_RESOLVED;
+	exports.STATE_REJECTED = STATE_REJECTED;
 	exports.isLogEntry = isLogEntry;
 	exports.createLogEntry = createLogEntry;
 	exports.getMeta = getMeta;
@@ -835,6 +867,8 @@
 	exports.eachTimers = eachTimers;
 	exports.patchTimers = patchTimers;
 	exports.revertPatchTimers = revertPatchTimers;
+	exports.patchPromise = patchPromise;
+	exports.revertPatchPromise = revertPatchPromise;
 	exports.patchNativeAPI = patchNativeAPI;
 	exports.revertPatchNativeAPI = revertPatchNativeAPI;
 

@@ -93,3 +93,9 @@ export function timeFormat(ts: number) {
 
 	return `${zeroPad(sec / 60 % 24 | 0)}:${zeroPad(sec % 60 | 0)}.${zeroPad(ts % 1000 | 0, 2)}`
 }
+
+export function markAsNativeCode(scope: Window, method: string) {
+	scope[method].toString = function () {
+		return `function ${method}() { [native code] }`;
+	};
+}

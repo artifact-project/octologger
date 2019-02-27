@@ -37,8 +37,8 @@ For logger from out of box.
 - **scope**(name: `string`, detail: `any`, inScope: `() => void`): `ScopeEntry`
 - **print**(): `void`
 - **clear**(): `void`
-- **getLastEntry**(): `void`
-- **getLastEntry**(): `void`
+- **getEntries**(): `Entry[]`
+- **getLastEntry**(): `Entry`
 
 #### logs
 

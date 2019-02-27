@@ -58,6 +58,7 @@ export type EntryMeta = {
 	column: number;
 }
 
+export const STATE_OK = 'ok';
 export const STATE_IDLE = 'idle';
 export const STATE_BUSY = 'BUSY';
 export const STATE_INTERACTIVE = 'interactive';
@@ -66,8 +67,12 @@ export const STATE_COMPLETED = 'completed';
 export const STATE_ABORTED = 'ABORTED';
 export const STATE_CANCELLED = 'cancelled';
 export const STATE_FAILED = 'failed';
+export const STATE_ERROR = 'error';
+export const STATE_RESOLVED = 'resolved';
+export const STATE_REJECTED = 'rejected';
 
-export type ProcessState = typeof STATE_IDLE
+export type ProcessState = typeof STATE_OK
+	| typeof STATE_IDLE
 	| typeof STATE_BUSY
 	| typeof STATE_INTERACTIVE
 	| typeof STATE_PENDING
@@ -75,6 +80,9 @@ export type ProcessState = typeof STATE_IDLE
 	| typeof STATE_ABORTED
 	| typeof STATE_CANCELLED
 	| typeof STATE_FAILED
+	| typeof STATE_ERROR
+	| typeof STATE_RESOLVED
+	| typeof STATE_REJECTED
 
 export interface ScopeEntry extends Entry {
 	detail: {
