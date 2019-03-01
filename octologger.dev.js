@@ -105,10 +105,10 @@
 	function createFormat(styles, format) {
 	    return function (entry) {
 	        var level = LogLevelsInvert[entry.level];
-	        return format(level, entry, {
+	        return format(level, entry, styles ? {
 	            base: styles.level[level],
 	            label: styles.label[level],
-	        });
+	        } : null);
 	    };
 	}
 	var nodeFromat = createFormat({
@@ -258,24 +258,9 @@
 		PromisePrototype: PromisePrototype
 	});
 
-	var nodeOutput = function (options) {
-	    if (options === void 0) { options = {}; }
-	    var _a = options.out, out = _a === void 0 ? console : _a, _b = options.format, format = _b === void 0 ? nodeFromat : _b;
-	    return function (entry) {
-	        if (entry === null) {
-	            return;
-	        }
-	        var fn = LogLevelsInvert[entry.level === 6 ? LogLevels.info : entry.level];
-	        out[fn].apply(out, format(entry));
-	    };
-	};
-	var browserOutput = function (options) {
-	    if (options === void 0) { options = {}; }
-	    var _a = options.out, out = _a === void 0 ? console : _a, _b = options.format, format = _b === void 0 ? browserFormat : _b;
+	var createOutput = function (options) {
+	    var out = options.out, format = options.format;
 	    var log = out.log;
-	    var groupSupproted = !!out.group;
-	    var groupEndSupproted = !!out.groupEnd;
-	    var groupCollapsedSupproted = !!out.groupCollapsed;
 	    var debounced = {};
 	    var openScopes = [];
 	    function print(entry, skipPrinted) {
@@ -344,6 +329,20 @@
 	        }
 	    }
 	    return print;
+	};
+	var nodeOutput = function (options) {
+	    if (options === void 0) { options = {}; }
+	    return createOutput({
+	        out: options.out || console,
+	        format: options.format || nodeFromat,
+	    });
+	};
+	var browserOutput = function (options) {
+	    if (options === void 0) { options = {}; }
+	    return createOutput({
+	        out: options.out || console,
+	        format: options.format || browserFormat,
+	    });
 	};
 	var universalOutput = typeof window !== 'undefined' ? browserOutput : nodeOutput;
 
@@ -857,6 +856,7 @@
 	exports.nodeFromat = nodeFromat;
 	exports.resetFormatStyle = resetFormatStyle;
 	exports.browserFormat = browserFormat;
+	exports.createOutput = createOutput;
 	exports.nodeOutput = nodeOutput;
 	exports.browserOutput = browserOutput;
 	exports.universalOutput = universalOutput;

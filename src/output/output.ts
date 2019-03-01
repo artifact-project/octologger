@@ -1,51 +1,25 @@
 import { Format, nodeFromat, browserFormat } from '../format/format';
-import { LogLevelsInvert, LogLevels } from '../logger/levels';
 import { Entry, EntryTypes } from '../logger/logger.types';
 import { setTimeout, console } from '../patcher/native';
 
 export type Output = (entry: Entry) => void;
 
 export type OutputOptions = {
-	out?: Partial<Console>;
-	format?: Format;
+	out: Partial<Console>;
+	format: Format;
 }
-
-export const nodeOutput = (options: OutputOptions = {}): Output => {
-	const {
-		out = console,
-		format = nodeFromat,
-	} = options;
-
-	return (entry: Entry) => {
-		if (entry === null) {
-			return;
-		}
-
-		const fn = LogLevelsInvert[entry.level === 6 ? LogLevels.info : entry.level];
-		out[fn](...format(entry));
-	};
-};
 
 type OutputEntry = Entry & {
 	printed?: boolean;
 }
 
-export const browserOutput = (options: OutputOptions = {}): Output => {
+export const createOutput = (options: OutputOptions): Output => {
 	const {
-		out = console,
-		format = browserFormat,
+		out,
+		format,
 	} = options;
 
 	const log = out.log;
-	const groups = {};
-	const groupSupproted = !!out.group;
-	const groupEndSupproted = !!out.groupEnd;
-	const groupCollapsedSupproted = !!out.groupCollapsed;
-
-	function printGroup(entry) {
-		out.group.apply(out, browserFormat(entry));
-	}
-
 	const debounced = {};
 	let openScopes: OutputEntry[] = [];
 
@@ -128,5 +102,14 @@ export const browserOutput = (options: OutputOptions = {}): Output => {
 	return print;
 };
 
+export const nodeOutput = (options: Partial<OutputOptions> = {}) => createOutput({
+	out: options.out || console,
+	format: options.format || nodeFromat,
+});
+
+export const browserOutput = (options: Partial<OutputOptions> = {}) => createOutput({
+	out: options.out || console,
+	format: options.format || browserFormat,
+});
 
 export const universalOutput = typeof window !== 'undefined' ? browserOutput : nodeOutput;

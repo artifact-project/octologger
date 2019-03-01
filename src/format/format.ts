@@ -22,7 +22,7 @@ export type StyleByLevel = {
 export type Format = (entry: Entry) => any[];
 
 export function createFormat(
-	styles: LogStyle,
+	styles: LogStyle | null,
 	format: (level: LogLevel, entry: Entry, colors: StyleByLevel) => string[],
 ): Format {
 	return (entry: Entry) => {
@@ -31,10 +31,10 @@ export function createFormat(
 		return format(
 			level,
 			entry,
-			{
+			styles ? {
 				base: styles.level[level],
 				label: styles.label[level],
-			},
+			} : null,
 		);
 	}
 }
