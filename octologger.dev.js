@@ -415,7 +415,7 @@
 	    if (state === void 0) { state = null; }
 	    return {
 	        cid: ++cid,
-	        ts: now(),
+	        ts: null,
 	        level: level,
 	        type: EntryTypes.scope,
 	        badge: badge,

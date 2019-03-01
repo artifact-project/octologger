@@ -107,7 +107,7 @@ export function createScopeEntry(
 ): ScopeEntry {
 	return {
 		cid: ++cid,
-		ts: now(),
+		ts: null,
 		level: level,
 		type: EntryTypes.scope,
 		badge,

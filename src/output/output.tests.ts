@@ -24,6 +24,7 @@ it('browser', () => {
 it('array', () => {
 	const log = [] as string[];
 	const logger = createLogger({
+		time: false,
 		output: [arrayOutput({out: log})],
 	}, () => ({
 	}));
