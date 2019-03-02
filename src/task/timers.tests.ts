@@ -3,9 +3,20 @@ import { globalThis, pause } from '../utils/utils';
 import { revertPatchTimers, patchTimers } from '../patcher/patcher';
 import { XError, parseError } from '../error/error';
 import { LogLevels } from '../logger/levels';
+import { arrayOutput } from '../output/array';
+
+let _currentLog = [] as string[];
+
+function getCurrentLog() {
+	return _currentLog.join('\n');
+}
 
 beforeAll(() => {
-	logger.setup({output: [], meta: true});
+	logger.setup({
+		output: [arrayOutput({out: _currentLog})],
+		meta: true,
+		time: false,
+	});
 	patchTimers(globalThis);
 });
 

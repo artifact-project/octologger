@@ -1,9 +1,8 @@
-import logger from '../logger/logger';
+import { logger } from '../logger/logger';
 import { globalThis } from '../utils/utils';
 import { patchPromise, revertPatchPromise } from '../patcher/patcher';
 import { ScopedPromise } from './promise';
-import { STATE_PENDING, STATE_RESOLVED, STATE_REJECTED, STATE_ERROR, STATE_OK } from '../logger/logger.types';
-import { NativePromise } from '../patcher/native';
+import { STATE_PENDING, STATE_RESOLVED, STATE_REJECTED, STATE_ERROR } from '../logger/logger.types';
 
 beforeAll(() => {
 	logger.setup({output: []});
