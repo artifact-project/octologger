@@ -1,6 +1,5 @@
 import { Format, nodeFromat, browserFormat } from '../format/format';
 import { Entry, EntryTypes } from '../logger/logger.types';
-import { setTimeout, console } from '../patcher/native';
 
 export type Output = (entry: Entry) => void;
 

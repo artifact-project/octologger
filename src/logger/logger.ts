@@ -1,13 +1,12 @@
 import { LogLevels, LogLevel } from './levels';
-import { Entry, EntryTypes, ScopeEntry, LoggerOptions, LoggerAPI, LoggerEnv, Logger, EntryMeta, LoggerContext, LoggerScope, LoggerScopeContext, ContextSnapshot } from './logger.types';
-import { parseStackRow } from '../stack/stack';
+import { Entry, EntryTypes, ScopeEntry, LoggerOptions, LoggerAPI, LoggerEnv, Logger, LoggerContext, LoggerScope, LoggerScopeContext, ContextSnapshot } from './logger.types';
 import { universalOutput } from '../output/output';
 import { now } from '../utils/utils';
 
 let cid = 0;
 
 export function isLogEntry(x: any): x is Entry {
-	return x && x.hasOwnProperty('type') && x.hasOwnProperty('level');
+	return x && x.type !== void 0 && x.level !== void 0;
 }
 
 export function createLogEntry(
@@ -33,23 +32,6 @@ export function createLogEntry(
 	};
 }
 
-export function getMeta(offset: number = 0): EntryMeta {
-	const stackTraceLimit = Error.stackTraceLimit;
-
-	Error.stackTraceLimit = offset + 1;
-
-	const error = new Error();
-	const stack = (error.stack || '').split('\n');
-
-	Error.stackTraceLimit = stackTraceLimit;
-
-	if (stack.length <= offset + 1) {
-		return null;
-	}
-
-	return parseStackRow(stack[offset + 1])
-}
-
 function createCoreLogger(options: Partial<LoggerOptions>, ctx: LoggerScopeContext) {
 	return {
 		add(message: string | Entry, detail?: any): Entry {
@@ -68,10 +50,6 @@ function createCoreLogger(options: Partial<LoggerOptions>, ctx: LoggerScopeConte
 					message,
 					detail,
 				);
-			}
-
-			if (options.meta && entry.meta === null) {
-				entry.meta = getMeta(3);
 			}
 
 			if (options.time) {
@@ -185,10 +163,6 @@ export function createLogger<LA extends LoggerAPI>(
 		options.time = true;
 	}
 
-	if (options.meta == null) {
-		options.meta = false;
-	}
-
 	if (options.storeLast == null) {
 		options.storeLast = 1e3;
 	}
@@ -215,7 +189,7 @@ export function createLogger<LA extends LoggerAPI>(
 		}
 	};
 
-	const api = factory({
+	const api: any = factory({
 		createLogEntry,
 		levels: LogLevels,
 		logger,
@@ -274,12 +248,12 @@ export function createLogger<LA extends LoggerAPI>(
 			null,
 			message,
 			detail,
-			options.meta ? getMeta(2) : null,
+			null,
 		);
 		_activeScopeContext.logger.add(scopeEntry);
 
 		const logger = createCoreLogger(options, {parent: scopeEntry});
-		const scopeAPI = factory({
+		const scopeAPI: any = factory({
 			createLogEntry,
 			levels: LogLevels,
 			logger,
@@ -329,7 +303,6 @@ const BADGES: {[K in LogLevel]?: string} = {
 };
 
 const octologger = createLogger({
-	meta: false,
 	output: [universalOutput()],
 }, ({
 	levels,
