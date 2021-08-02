@@ -8,14 +8,14 @@ We Appreciate <s>Power</s>Logs.
 ### Usage
 
 ```ts
-import { octoLogger } from 'octologger'; // or import { logger } from 'octologger';
+import { octoLogger } from 'octologger'; // or import { logger, xlog } from 'octologger';
 
 octoLogger.info('Wow!');
 octoLogger.scope('users', (scope) => {
-	logger.add('Start');
+	scope.add('Start');
 
 	setTimeout(() => {
-		logger.done('End');
+		scope.done('End');
 	}, 100);
 });
 ```
