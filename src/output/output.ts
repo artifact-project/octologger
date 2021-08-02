@@ -1,10 +1,10 @@
 import { Format, nodeFromat, browserFormat } from '../format/format';
-import { Entry, EntryTypes } from '../logger/logger.types';
+import { Entry, SCOPE } from '../logger/logger.types';
 
-export type Output = (entry: Entry) => void;
+export type Output = (entry: Entry | null) => void;
 
 export type OutputOptions = {
-	out: Partial<Console>;
+	out: Pick<Console, 'log' | 'group' | 'groupEnd'>;
 	format: Format;
 }
 
@@ -18,11 +18,11 @@ export const createOutput = (options: OutputOptions): Output => {
 		format,
 	} = options;
 
-	const log = out.log;
+	const {log} = out;
 	const debounced = {};
 	let openScopes: OutputEntry[] = [];
 
-	function print(entry: OutputEntry, skipPrinted?: boolean) {
+	function print(entry: OutputEntry | null, skipPrinted?: boolean) {
 		if (entry === null) {
 			openScopes.forEach(() => {
 				out.groupEnd();
@@ -31,7 +31,7 @@ export const createOutput = (options: OutputOptions): Output => {
 			return;
 		}
 
-		const parent = entry.parent as OutputEntry;
+		const parent = entry.parent as OutputEntry | null;
 		const opened = openScopes.length;
 
 		if (skipPrinted && entry.printed) {
@@ -53,8 +53,8 @@ export const createOutput = (options: OutputOptions): Output => {
 			openScopes.length = idx + 1;
 		}
 
-		if (entry.type === EntryTypes.scope) {
-			if (entry.detail.state === 'idle') {
+		if (entry.type === SCOPE) {
+			if (entry.detail && entry.detail.state === 'idle') {
 				entry.printed = true;
 				log.apply(out, format(entry));
 			} else {
@@ -62,7 +62,7 @@ export const createOutput = (options: OutputOptions): Output => {
 				out.group.apply(out, format(entry));
 			}
 		} else {
-			if (!skipPrinted && parent.printed && parent.label !== '#root') {
+			if (!skipPrinted && parent && parent.printed && parent.label !== '#root') {
 				debounced[parent.cid] || (debounced[parent.cid] = setTimeout(() => {
 					openScopes.forEach(() => {
 						out.groupEnd();
@@ -70,12 +70,12 @@ export const createOutput = (options: OutputOptions): Output => {
 					openScopes.length = 0;
 
 					const chain = [] as OutputEntry[];
-					let cursor = parent; let i = 0;
+					let cursor: OutputEntry | null = parent;
 
 					do {
-						chain.unshift(cursor)
-						cursor = cursor.parent;
-					} while (cursor.label !== '#root');
+						chain.unshift(cursor!);
+						cursor = cursor!.parent;
+					} while (cursor && cursor.label !== '#root');
 
 					chain.forEach(entry => {
 						out.group.apply(out, format(entry));
@@ -111,4 +111,4 @@ export const browserOutput = (options: Partial<OutputOptions> = {}) => createOut
 	format: options.format || browserFormat,
 });
 
-export const universalOutput = typeof window !== 'undefined' ? browserOutput : nodeOutput;
+export const universalOutput = typeof self === 'undefined' ? nodeOutput : browserOutput;

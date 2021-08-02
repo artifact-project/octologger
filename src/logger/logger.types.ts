@@ -1,10 +1,7 @@
 import { Output } from '../output/output';
-import { LogLevels, LogLevel } from './levels';
 
-export const EntryTypes = {
-	entry: 0,
-	scope: 1,
-}
+export const ENTRY = 1;
+export const SCOPE = 2;
 
 export type CoreLogger = {
 	add(entry: Entry): Entry;
@@ -18,22 +15,19 @@ export type LoggerAPI = {
 export type LoggerOptions = {
 	meta: boolean;
 	time: boolean;
-	levels: LogLevel[];
 	silent: boolean;
 	storeLast: number;
-	output: Output[];
+	output: Output | null;
 }
 
-export type LoggerEnv = {
-	levels: typeof LogLevels;
+export type LoggerFactoryAPI = {
 	logger: CoreLogger;
-	createLogEntry: (
+	createEntry: (
 		level: Entry['level'],
 		badge: Entry['badge'],
 		label: Entry['label'],
 		message: Entry['message'],
 		detail: Entry['detail'],
-		meta: EntryMeta,
 	) => Entry;
 }
 
@@ -41,84 +35,59 @@ export interface Entry {
 	cid: number;
 	ts: number;
 	type: number;
-	badge: string;
-	level: number;
-	label: string;
-	message: string;
+	level: string;
+	badge: string | null;
+	label: string | null;
+	message?: string | null;
 	detail: any;
-	meta: EntryMeta;
-	parent: Entry;
+	meta: EntryMeta | null;
+	parent: Entry | null;
 	entries: Entry[];
 }
 
 export type EntryMeta = {
-	fn: string;
 	file: string;
 	line: number;
-	column: number;
+	col: number;
 }
-
-export const STATE_OK = 'ok';
-export const STATE_IDLE = 'idle';
-export const STATE_BUSY = 'BUSY';
-export const STATE_INTERACTIVE = 'interactive';
-export const STATE_PENDING = 'pending';
-export const STATE_COMPLETED = 'completed';
-export const STATE_ABORTED = 'ABORTED';
-export const STATE_CANCELLED = 'cancelled';
-export const STATE_FAILED = 'failed';
-export const STATE_ERROR = 'error';
-export const STATE_RESOLVED = 'resolved';
-export const STATE_REJECTED = 'rejected';
-
-export type ProcessState = typeof STATE_OK
-	| typeof STATE_IDLE
-	| typeof STATE_BUSY
-	| typeof STATE_INTERACTIVE
-	| typeof STATE_PENDING
-	| typeof STATE_COMPLETED
-	| typeof STATE_ABORTED
-	| typeof STATE_CANCELLED
-	| typeof STATE_FAILED
-	| typeof STATE_ERROR
-	| typeof STATE_RESOLVED
-	| typeof STATE_REJECTED
 
 export interface ScopeEntry extends Entry {
-	detail: {
-		info: any;
-		state: ProcessState;
-	};
 }
 
+type OctoShell<T>= T & {__octoret__?: never};
+
+export type OctoMethod<T extends (...args: any[]) => any> = T extends (...args: infer A) => infer R
+	? (...args: A) => OctoShell<R>
+	: OctoShell<T>
+
 export type ScopeExecutor<LA extends LoggerAPI, LS extends LoggerScope<LA>> = (scope: LS) => void;
+
 export type LoggerScope<LA extends LoggerAPI> = {
-	[K in keyof LA]: LA[K];
+	[K in keyof LA]: OctoMethod<LA[K]>;
 } & {
-	add(...args: any[]): Entry;
+	add: OctoMethod<(...args: any[]) => Entry>;
 
 	scope(): ScopeEntry; // current scope
 
 	scope(
 		message: string | ScopeEntry,
 		executor?: ScopeExecutor<LA, LoggerScope<LA>>,
-	): LoggerScope<LA>;
+	): OctoShell<LoggerScope<LA>>;
 
 	scope(
 		message: string | ScopeEntry,
 		detail: any,
 		executor?: ScopeExecutor<LA, LoggerScope<LA>>,
-	): LoggerScope<LA>;
+	): OctoShell<LoggerScope<LA>>;
 }
 
 export type Logger<LA extends LoggerAPI> = LoggerScope<LA> & {
 	setup: (optionsPatch: Partial<LoggerOptions>) => void;
-	add(...args: any[]): Entry;
 	print(): void;
 	clear(): Entry[];
-	getEntries(): Entry[];
-	getLastEntry(): Entry;
-	getContext(): LoggerContext<LA> | null;
+	entries(): Entry[];
+	last(): Entry;
+	// context(): LoggerContext<LA> | null;
 }
 
 export type LoggerContext<LA extends LoggerAPI> = {
@@ -126,18 +95,31 @@ export type LoggerContext<LA extends LoggerAPI> = {
 	entry: ScopeEntry;
 	logger: CoreLogger;
 	options: Partial<LoggerOptions>;
-	scopeContext?: LoggerScopeContext;
+	scopeContext: LoggerScopeContext | null;
 }
 
 export type LoggerScopeContext = {
-	parent: ScopeEntry;
-	logger?: CoreLogger;
+	parent: ScopeEntry | null;
+	logger: CoreLogger | null;
 }
 
 export type ContextSnapshot = {
-	activeContext: LoggerContext<any>;
+	activeContext: LoggerContext<any> | null;
 	ctx: LoggerContext<any>;
 	scope: LoggerScope<any>;
-	scopeContext: LoggerScopeContext;
-	scopeContextParent: ScopeEntry;
+	scopeContext: LoggerScopeContext | null;
+	scopeContextParent: ScopeEntry | null;
 }
+
+// export type LiteralUnion<
+// 	LiteralType,
+// 	BaseType extends Primitive
+// > = LiteralType | (BaseType & {_?: never});
+
+// export type BaseLogLevels = 
+// 	| 'log'
+// 	| 'info'
+// 	| 'warn'
+// 	| 'error'
+// 	| 'verbose'
+// ;

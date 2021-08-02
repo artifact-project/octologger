@@ -1,12 +1,12 @@
 // Jest Snapshot v1, https://goo.gl/fbAQLP
 
-exports[`array 1`] = `
+exports[`output array 1`] = `
 "foo [1,2] and null !== undefined
-root {\\"info\\":null,\\"state\\":null}
+root
   | bar
-  | deep {\\"info\\":null,\\"state\\":null}
+  | deep
      | baz
-     | deeper {\\"info\\":null,\\"state\\":null}
+     | deeper
         | wow
  qux"
 `;

@@ -6,11 +6,19 @@
     "moduleResolution": "node",
     "experimentalDecorators": true,
     "noImplicitThis": true,
+    "strictNullChecks": true,
+    "esModuleInterop": true,
     "lib": [
       "dom",
       "es5",
       "es2015.promise",
       "es2016.array.include"
+    ],
+    "plugins": [
+      {
+        "type": "checker",
+        "transform": "./tx.ts"
+      },
     ]
   },
   "exclude": [

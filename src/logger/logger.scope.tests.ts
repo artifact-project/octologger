@@ -1,9 +1,8 @@
-import logger, { createScopeEntry } from '../logger/logger';
-import { LogLevels } from './levels';
+import { logger, createScopeEntry } from '../logger/logger';
 
 
 beforeEach(() => {
-	logger.setup({output: [], meta: true});
+	logger.setup({output: null, meta: true});
 	logger.clear();
 });
 
@@ -14,18 +13,18 @@ it('scope: base', () => {
 
 it('scope: createScopeEntry', () => {
 	const scope = logger.scope(createScopeEntry(
-		LogLevels.info,
+		'info',
 		'X',
 		'label',
 		'msg',
 		{foo: 'bar'},
 	));
 
-	expect(scope.scope().level).toBe(LogLevels.info);
+	expect(scope.scope().level).toBe('info');
 	expect(scope.scope().badge).toBe('X');
 	expect(scope.scope().label).toBe('label');
 	expect(scope.scope().message).toBe('msg');
-	expect(scope.scope().detail.info).toEqual({foo: 'bar'});
+	expect(scope.scope().detail).toEqual({foo: 'bar'});
 });
 
 it('scope', function scopeTest() {
@@ -36,8 +35,8 @@ it('scope', function scopeTest() {
 	logger.log('out of scope');
 
 	// Root Entries
-	expect(logger.getEntries().length).toEqual(2);
-	expect(logger.getLastEntry().detail).toEqual(['out of scope']);
+	expect(logger.entries().length).toEqual(2);
+	expect(logger.last().detail).toEqual(['out of scope']);
 
 	// Scope API
 	expect(typeof scope.log).toEqual('function');
@@ -47,7 +46,7 @@ it('scope', function scopeTest() {
 	// expect(scope.scope().meta.line).toEqual(startMeta.line + 1);
 
 	// Info
-	expect(scope.scope().detail.info).toEqual({timeout: 123});
+	expect(scope.scope().detail).toEqual({timeout: 123});
 
 	// Entries
 	expect(scope.scope().entries.length).toEqual(2);
@@ -79,7 +78,7 @@ it('nested scopes', function inScope0() {
 		});
 	});
 
-	expect(logger.getEntries().length).toEqual(1);
+	expect(logger.entries().length).toEqual(1);
 
 	// D1
 	const s1 = d1.scope();

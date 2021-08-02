@@ -1,9 +1,25 @@
-export * from './src/logger/logger.types';
-export * from './src/logger/logger';
+export type {
+	Logger,
+	Logger as OctoLogger,
+	Entry as LoggerEntry,
+} from './src/logger/logger.types';
 
-export * from './src/error/error';
-export * from './src/format/format';
-export * from './src/output/output';
-export * from './src/stack/stack';
-export * from './src/logger/levels';
-export * from './src/patcher/patcher';
+export {
+	logger,
+	logger as xlog,
+	logger as octoLogger,
+	createLogger,
+} from './src/logger/logger';
+
+export {
+	createOutput,
+	browserOutput,
+	nodeOutput,
+	universalOutput,
+} from './src/output/output';
+
+export {
+	browserFormat,
+	nodeFromat,
+	createFormat
+} from './src/format/format';

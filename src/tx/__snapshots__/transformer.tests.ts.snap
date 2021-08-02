@@ -1,0 +1,31 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`transformer createProgram 1`] = `
+"/Users/k.lebedev/Developer/octologger/src/tx/transformer.fixture.ts
+
+import { logger } from '../logger/logger';
+logger.add([\\"src/tx/transformer.fixture.ts\\",3,1], 'ok');
+const { info } = logger;
+info([\\"src/tx/transformer.fixture.ts\\",6,1], 'wow');
+const scope = logger.scope([\\"src/tx/transformer.fixture.ts\\",8,15], 'fetch');
+scope.add([\\"src/tx/transformer.fixture.ts\\",10,1], 'start');
+scope.done([\\"src/tx/transformer.fixture.ts\\",11,1], 'response');
+
+"
+`;
+
+exports[`transformer transpile 1`] = `
+"import { logger } from '../logger/logger';
+logger.add('ok');
+const { info } = logger;
+info('wow');
+"
+`;
+
+exports[`transformer transpileModule 1`] = `
+"import { logger } from '../logger/logger';
+logger.add('ok');
+const { info } = logger;
+info('wow');
+"
+`;

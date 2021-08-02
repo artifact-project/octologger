@@ -1,53 +1,56 @@
-import logger from './logger';
-import { LogLevels } from './levels';
+import {logger} from './logger';
+import { Entry, EntryMeta } from './logger.types';
+
+beforeEach(() => {
+	logger.clear();
+	logger.setup({meta: false, output: null});
+});
 
 describe('core', () => {
-	logger.clear();
-	logger.setup({meta: false, output: []});
-
-	Object.keys(LogLevels).forEach((level) => {
+	['add', 'log', 'info', 'done', 'warn', 'verbose', 'error'].forEach((level) => {
 		describe(level, () => {
-			if (!logger.hasOwnProperty(level)) {
-				throw new Error(`Level "${level}" not supproted`);
-			}
-
-			logger[level](level);
-
-			const entry = logger.getLastEntry();
-
-			it('level', () => {
-				expect(entry.level).toBe(LogLevels[level]);
+			it('support', () => {
+				if (!logger.hasOwnProperty(level)) {
+					throw new Error(`Level "${level}" not supproted`);
+				}
 			});
 
 			it('detail', () => {
-				expect(entry.detail).toEqual([level]);
+				// Add Log Record
+				logger[level](level);
+				expect(logger.last().detail).toEqual([level]);
 			});
 		});
 	});
 });
 
-// describe('meta', function metaTest() {
-// 	logger.clear();
-// 	logger.setup({meta: true, output: []});
+describe('meta', () => {
+	const log: Entry[] = [];
+	const toMeta = (arg: any): EntryMeta => ({file: arg[0], line: arg[1], col: arg[2]});
+	
+	beforeEach(() => {
+		log.length = 0;
+		logger.setup({output: (entry) => log.push(entry!)});
+	});
+	
+	it('log', () => {
+		const meta = ['log.ts', 123, 456];
 
-// 	const metaErr = parseError(new Error);
-// 	logger.log('wow');
+		logger.add(meta, 'log-with-meta');
 
-// 	const entry = logger.getLastEntry();
+		expect(log.length).toBe(1);
+		expect(log[0].detail).toEqual(['log-with-meta']);
+		expect(log[0].meta).toEqual(toMeta(meta));
+	});
+	
+	it('scope', () => {
+		const meta = ['scope.ts', 123, 456];
 
-// 	it('fn', () => {
-// 		expect(entry.meta.fn).toEqual(metaErr.fn);
-// 	});
+		(logger.scope as any)(meta, 'scope-with-meta', {foo: 123});
 
-// 	it('file', () => {
-// 		expect(entry.meta.file).toEqual(metaErr.file);
-// 	});
-
-// 	it('line', () => {
-// 		expect(entry.meta.line).toEqual(metaErr.line + 1);
-// 	});
-
-// 	it('column', () => {
-// 		expect(entry.meta.column).toEqual(9);
-// 	});
-// });
+		expect(log.length).toBe(1);
+		expect(log[0].message).toEqual('scope-with-meta');
+		expect(log[0].detail).toEqual({foo: 123});
+		expect(log[0].meta).toEqual(toMeta(meta));
+	});
+});

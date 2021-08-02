@@ -1,76 +1,43 @@
-import { LogLevels, LogLevel } from './levels';
-import { Entry, EntryTypes, ScopeEntry, LoggerOptions, LoggerAPI, LoggerEnv, Logger, LoggerContext, LoggerScope, LoggerScopeContext, ContextSnapshot } from './logger.types';
+import { Entry, ScopeEntry, LoggerOptions, LoggerAPI, LoggerFactoryAPI, Logger, LoggerContext, LoggerScope, LoggerScopeContext, ContextSnapshot, EntryMeta, ScopeExecutor, SCOPE, ENTRY } from './logger.types';
 import { universalOutput } from '../output/output';
 import { now } from '../utils/utils';
 
+const time = new Date();
 let cid = 0;
+
+type CompactMetaArg = [string, number, number];
+
+function isMeta(arg: any): arg is CompactMetaArg {
+	return arg && arg.length === 3 && arg[0] && arg[1] > 0 && arg[2] > 0;
+}
+
+function toMeta(arg: CompactMetaArg): EntryMeta {
+	return {file: arg[0], line: arg[1], col: arg[2]};
+}
 
 export function isLogEntry(x: any): x is Entry {
 	return x && x.type !== void 0 && x.level !== void 0;
 }
 
-export function createLogEntry(
+export function createEntry(
 	level: Entry['level'],
 	badge: Entry['badge'],
 	label: Entry['label'],
 	message: Entry['message'],
 	detail: Entry['detail'],
-	meta: Entry['meta'] = null,
 ): Entry {
 	return {
 		cid: ++cid,
-		ts: null,
-		type: EntryTypes.entry,
+		ts: 0,
+		type: ENTRY,
 		level,
 		badge,
 		label,
 		message,
 		detail,
-		meta,
+		meta: null,
 		parent: null,
 		entries: [],
-	};
-}
-
-function createCoreLogger(options: Partial<LoggerOptions>, ctx: LoggerScopeContext) {
-	return {
-		add(message: string | Entry, detail?: any): Entry {
-			const parent = ctx.parent;
-			let entry: Entry;
-
-			// console.log(ctx.parent.message);
-
-			if (isLogEntry(message)) {
-				entry = message;
-			} else {
-				entry = createLogEntry(
-					LogLevels.log,
-					null,
-					null,
-					message,
-					detail,
-				);
-			}
-
-			if (options.time) {
-				entry.ts = now();
-			}
-
-			const length = (entry.parent = parent).entries.push(entry);
-
-			if (length > options.storeLast) {
-				parent.entries.splice(0, 1);
-			}
-
-			if (options.silent !== true) {
-				let idx = options.output.length;
-				while (idx--) {
-					options.output[idx](entry);
-				}
-			}
-
-			return entry;
-		},
 	};
 }
 
@@ -80,43 +47,38 @@ export function createScopeEntry(
 	label: Entry['label'],
 	message: Entry['message'],
 	detail: Entry['detail'],
-	meta: Entry['meta'] = null,
-	state: ScopeEntry['detail']['state'] = null,
 ): ScopeEntry {
 	return {
 		cid: ++cid,
-		ts: null,
+		ts: 0,
 		level: level,
-		type: EntryTypes.scope,
+		type: SCOPE,
 		badge,
 		label,
 		parent: null,
 		message,
-		detail: {
-			info: detail,
-			state,
-		},
-		meta,
+		detail,
+		meta: null,
 		entries: [],
 	}
 }
 
-let _activeContext: LoggerContext<any> = null;
+let _activeContext: LoggerContext<any> | null = null;
 
-export function getLoggerContext(): LoggerContext<any> {
+export function getLoggerContext(): LoggerContext<any> | null {
 	return _activeContext;
 }
 
-export function switchLoggerContext(ctx: LoggerContext<any>, scope: LoggerScope<any>): ContextSnapshot {
+export function switchLoggerContext(ctx: LoggerContext<any>, scope: LoggerScope<any>): ContextSnapshot | null {
 	if (ctx === null) {
 		_activeContext = null;
-		return;
+		return null;
 	}
 
 	const prev_activeContext = _activeContext;
 	const prev_scope = ctx.scope;
 	const prev_scopeContext = ctx.scopeContext;
-	let prev_scopeContextParent: ScopeEntry;
+	let prev_scopeContextParent: ScopeEntry | null = null;
 
 	_activeContext = ctx;
 	ctx.scope = scope;
@@ -153,9 +115,68 @@ export function revertLoggerContext(snapshot: ContextSnapshot) {
 
 export function createLogger<LA extends LoggerAPI>(
 	options: Partial<LoggerOptions>,
-	factory: (env: LoggerEnv) => LA,
+	factory: (api: LoggerFactoryAPI) => LA,
 ): Logger<LA> {
-	if (options.silent == null) {
+	const createCoreLogger = (ctx: LoggerScopeContext) => ({
+		add(message: string | Entry, detail?: any): Entry {
+			let entry: Entry;
+
+			if (isLogEntry(message)) {
+				entry = message;
+			} else {
+				entry = createEntry(
+					'log',
+					null,
+					null,
+					message,
+					detail,
+				);
+			}
+
+			const {detail:args} = entry;
+
+			if (args && args.length && isMeta(args[0])) {
+				entry.meta = toMeta(args.shift());
+			}
+
+			if (options.time) {
+				entry.ts = now();
+			}
+
+			const parent = ctx.parent;
+			
+			if (parent) {
+				const length = (entry.parent = parent).entries.push(entry);
+				
+				if (length > options.storeLast!) {
+					parent.entries.splice(0, 1);
+				}
+			}
+
+			if (options.silent !== true && options.output) {
+				options.output(entry);
+			}
+
+			return entry;
+		},
+	});
+	const root = createScopeEntry('info', '🚧', '#root', 'root', {
+		time,
+		created: new Date(),
+	});
+	const _activeScopeContext: LoggerScopeContext = {
+		logger: null,
+		parent: root,
+	};
+	const logger = createCoreLogger(_activeScopeContext);
+	const api = factory({
+		createEntry,
+		logger,
+	}) as Logger<LA> & {
+		m: EntryMeta | null;
+	};
+
+	if (options.silent == null && typeof location !== 'undefined') {
 		options.silent = !/^(about:|file:|https?:\/\/localhost\/)/.test(location + '');
 	}
 
@@ -167,38 +188,12 @@ export function createLogger<LA extends LoggerAPI>(
 		options.storeLast = 1e3;
 	}
 
-	if (options.output == null) {
-		options.output = [];
-	}
-
-	// todo: creation meta
-	const root = createScopeEntry(LogLevels.info, '🚧', '#root', null, null);
-	const _activeScopeContext: LoggerScopeContext = {
-		logger: null,
-		parent: root,
-	};
-	const logger = createCoreLogger(options, _activeScopeContext);
-
 	_activeScopeContext.logger = logger;
 
-	const setup = (optionsPatch: Partial<LoggerOptions>) => {
-		for (let key in optionsPatch) {
-			if (optionsPatch.hasOwnProperty(key)) {
-				options[key] = optionsPatch[key];
-			}
-		}
-	};
-
-	const api: any = factory({
-		createLogEntry,
-		levels: LogLevels,
-		logger,
-	});
-
 	// Reserved methods
-	['add', 'clear', 'scope', 'setup', 'getEntries', 'getLastEntry'].forEach((name) => {
+	['add', 'clear', 'scope', 'setup', 'entries', 'last', 'priny', 'm'].forEach((name) => {
 		if (api.hasOwnProperty(name)) {
-			throw new SyntaxError(`[octologger] "${name}" is a reserved identifier`);
+			throw new Error(`[octoLogger] "${name}" is a reserved identifier`);
 		}
 	});
 
@@ -206,13 +201,10 @@ export function createLogger<LA extends LoggerAPI>(
 		function next(root: Entry & {printed?: boolean}) {
 			root.printed = false;
 			root.entries.forEach((entry: Entry & {printed?: boolean}) => {
-				let idx = options.output.length;
-				while (idx--) {
-					entry.printed = false;
-					options.output[idx](entry);
-				}
+				entry.printed = false;
+				options.output && options.output(entry);
 
-				if (entry.type === EntryTypes.scope) {
+				if (entry.type === SCOPE) {
 					next(entry);
 				}
 			});
@@ -221,20 +213,39 @@ export function createLogger<LA extends LoggerAPI>(
 		next(root);
 
 		// Close all groups
-		let idx = options.output.length;
-		while (idx--) {
-			options.output[idx](null);
-		}
+		options.output && options.output(null);
 	};
 
-	api.add = (...args: any[]) => logger.add(createLogEntry(LogLevels.log, null, null, null, args));
+	api.add = (...args: any[]) => logger.add(createEntry('log', null, null, null, args));
 	api.clear = () => root.entries.splice(0, root.entries.length);
-	api.setup = setup;
-	api.getEntries = () => root.entries;
-	api.getLastEntry = () => root.entries[root.entries.length - 1] || null;
-	api.scope = function scopeCreator(message: string, detail: any, executor?: Function) {
-		if (arguments.length === 0) {
+	api.setup = (optionsPatch: Partial<LoggerOptions>) => {
+		for (let key in optionsPatch) {
+			if (optionsPatch.hasOwnProperty(key)) {
+				options[key] = optionsPatch[key];
+			}
+		}
+	};
+	api.entries = () => root.entries;
+	api.last = () => root.entries[root.entries.length - 1] || null;
+	api.scope = function scopeCreator(
+		this: Logger<LA>,
+		message?: string | Entry,
+		detail?: any,
+		executor?: ScopeExecutor<LA, LoggerScope<LA>>,
+	) {
+		const args = arguments;
+		let meta: EntryMeta | null = null;
+
+		if (args.length === 0) {
 			return (this as any)._scopeEntry;
+		}
+		
+		const firstArg = args[0];
+		if (isMeta(firstArg)) {
+			meta = toMeta(firstArg);
+			message = args[1];
+			detail = args[2];
+			executor = args[3];
 		}
 
 		if (executor == null && typeof detail === 'function') {
@@ -243,23 +254,23 @@ export function createLogger<LA extends LoggerAPI>(
 		}
 
 		const scopeEntry = isLogEntry(message) ? message : createScopeEntry(
-			LogLevels.info,
+			'info',
 			null,
 			null,
 			message,
 			detail,
-			null,
 		);
-		_activeScopeContext.logger.add(scopeEntry);
+		
+		scopeEntry.meta = meta;
+		_activeScopeContext.logger!.add(scopeEntry);
 
-		const logger = createCoreLogger(options, {parent: scopeEntry});
+		const logger = createCoreLogger({parent: scopeEntry, logger: null});
 		const scopeAPI: any = factory({
-			createLogEntry,
-			levels: LogLevels,
+			createEntry,
 			logger,
 		});
 
-		scopeAPI.add = (...args: any[]) => logger.add(createLogEntry(LogLevels.log, null, null, null, args));
+		scopeAPI.add = (...args: any[]) => logger.add(createEntry('log', null, null, null, args));
 		scopeAPI.scope = scopeCreator;
 		(scopeAPI as any)._scopeEntry = scopeEntry;
 
@@ -290,35 +301,26 @@ export function createLogger<LA extends LoggerAPI>(
 		return scopeAPI;
 	};
 
-	return api as Logger<LA>;
+	return api;
 }
 
-const BADGES: {[K in LogLevel]?: string} = {
+const BADGES = {
+	log: null,
 	info: '❕',
+	done: '✅',
 	warn: '⚠️',
 	error: '🛑',
 	verbose: '🔎',
-	debug: '⁉️',
-	success: '✅',
 };
 
-const octologger = createLogger({
-	output: [universalOutput()],
-}, ({
-	levels,
-	logger,
-}) => Object.keys(levels).reduce((api, level) => {
+export const logger = createLogger({
+	output: universalOutput(),
+}, ({logger}) => Object.keys(BADGES).reduce((api, level) => {
 	api[level] = (...args: any[]) => {
-		logger.add(createLogEntry(levels[level], BADGES[level] || null, null, null, args));
+		logger.add(createEntry(level, BADGES[level] || null, null, null, args));
 	};
 
 	return api;
 }, {}) as {
-	[K in (keyof typeof levels)]: (...args: any[]) => void;
+	[K in (keyof typeof BADGES)]: (...args: any[]) => void;
 });
-
-export {
-	octologger,
-	octologger as logger,
-	octologger as default,
-};

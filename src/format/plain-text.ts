@@ -2,23 +2,23 @@ import { createFormat } from './format';
 import { timeFormat } from '../utils/utils';
 
 export const plainTextFormat = createFormat(
-	null,
-	(_, entry) => {
-		const fmt = [];
+	{label: {}, level: {}},
+	(entry) => {
+		const fmt: string[] = [];
 
-		if (entry.ts !== null) {
-			fmt.push(`[${timeFormat(entry.ts)}]`);
+		if (entry.ts > 0) {
+			fmt.push(`[${timeFormat(entry.ts!)}]`);
 		}
 
-		if (entry.badge !== null) {
+		if (entry.badge != null) {
 			fmt.push(entry.badge);
 		}
 
-		if (entry.label !== null) {
+		if (entry.label != null) {
 			fmt.push(`(${entry.label})`);
 		}
 
-		if (entry.message !== null) {
+		if (entry.message != null) {
 			fmt.push(entry.message);
 		}
 
@@ -35,8 +35,8 @@ export const plainTextFormat = createFormat(
 			}
 		}
 
-		if (entry.meta !== null) {
-			fmt.push(`${entry.meta.file}:${entry.meta.line}:${entry.meta.column} (${entry.meta.fn})`);
+		if (entry.meta != null) {
+			fmt.push(`${entry.meta.file}:${entry.meta.line}:${entry.meta.col}`);
 		}
 
 		return fmt;
@@ -46,7 +46,7 @@ export const plainTextFormat = createFormat(
 const {toString} = ({});
 const R_PRIMITIVE = /string|number|boolean/i;
 
-function stringify(val: object) {
+function stringify(val?: any) {
 	try {
 		const type = toString.call(val);
 

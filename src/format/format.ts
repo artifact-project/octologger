@@ -1,17 +1,11 @@
 import { Entry } from '../logger/logger.types';
-import { LogLevel, LogLevelsInvert } from '../logger/levels';
 import { timeFormat } from '../utils/utils';
 
 const R_VALUE = /:([^;]+)/g;
 
 export type LogStyle = {
-	level: {
-		[K in LogLevel]: string;
-	};
-
-	label: {
-		[name:string]: string;
-	};
+	level: Record<string, string | undefined>;
+	label: Record<string, string | undefined>;
 }
 
 export type StyleByLevel = {
@@ -22,67 +16,57 @@ export type StyleByLevel = {
 export type Format = (entry: Entry) => any[];
 
 export function createFormat(
-	styles: LogStyle | null,
-	format: (level: LogLevel, entry: Entry, colors: StyleByLevel) => string[],
+	styles: LogStyle,
+	format: (entry: Entry, colors: StyleByLevel) => string[],
 ): Format {
-	return (entry: Entry) => {
-		const level = LogLevelsInvert[entry.level] as LogLevel;
-
-		return format(
-			level,
-			entry,
-			styles ? {
-				base: styles.level[level],
-				label: styles.label[level],
-			} : null,
-		);
-	}
+	return (entry: Entry) => format(entry, {
+		base: styles.level[entry.level] || '',
+		label: styles.label[entry.level] || '',
+	});
 }
 
 export const nodeFromat = createFormat(
 	{
 		level: {
-			error: '\x1b[31m',
-			warn: '\x1b[33m',
 			log: '\x1b[0m',
 			info: '\x1b[34m',
-			success: '\x1b[34m',
+			done: '\x1b[34m',
+			warn: '\x1b[33m',
+			error: '\x1b[31m',
 			verbose: '\x1b[35m',
-			debug: '\x1b[35m',
 		},
 
 		label: {
-			error: '\x1b[4m',
-			warn: '\x1b[4m',
 			log: '\x1b[4m',
 			info: '\x1b[4m',
-			success: '\x1b[4m',
+			done: '\x1b[4m',
+			error: '\x1b[4m',
+			warn: '\x1b[4m',
 			verbose: '\x1b[4m',
-			debug: '\x1b[4m',
 		},
 	},
 
-	(_, entry, style) => {
-		const args = [];
+	(entry, style) => {
+		const args: string[] = [];
 
-		if (entry.badge !== null) {
+		if (entry.badge != null) {
 			args.push(entry.badge)
 		}
 
-		if (entry.label !== null) {
+		if (entry.label != null) {
 			args.push(`${style.base}${style.label}${entry.label}\x1b[0m`);
 		}
 
-		if (entry.message !== null) {
+		if (entry.message != null) {
 			args.push(`${style.base}${entry.message}`);
 		}
 
-		if (entry.detail !== null) {
+		if (entry.detail != null) {
 			args.push(entry.detail);
 		}
 
 		if (entry.meta !== null) {
-			args.push(`${entry.meta.file}:${entry.meta.line}:${entry.meta.column} (${entry.meta.fn})`);
+			args.push(`${entry.meta.file}:${entry.meta.line}:${entry.meta.col}`);
 		}
 
 		args.push('\x1b[0m');
@@ -100,46 +84,44 @@ export function resetFormatStyle(val: string) {
 export const browserFormat = createFormat(
 	{
 		level: {
-			error: 'color: red;',
-			warn: 'color: orange;',
 			log: 'color: #333;',
-			success: 'color: #1aaa55;',
 			info: 'color: dodgerblue;',
+			done: 'color: #1aaa55;',
+			warn: 'color: orange;',
+			error: 'color: red;',
 			verbose: 'color: magenta;',
-			debug: 'color: #8b1fdd;',
 		},
 
 		label: {
-			error: LABEL_STYLE,
-			warn: LABEL_STYLE,
 			log: LABEL_STYLE,
 			info: LABEL_STYLE,
-			success: LABEL_STYLE,
+			done: LABEL_STYLE,
+			warn: LABEL_STYLE,
+			error: LABEL_STYLE,
 			verbose: LABEL_STYLE,
-			debug: LABEL_STYLE,
 		},
 	},
 
-	(_, entry, style) => {
-		const fmt = [];
-		const args = [];
+	(entry, style) => {
+		const fmt: string[] = [];
+		const args: string[] = [];
 
-		if (entry.ts !== null) {
+		if (entry.ts > 0) {
 			fmt.push('%c[%s] ');
 			args.push(style.base, timeFormat(entry.ts));
 		}
 
-		if (entry.badge !== null) {
+		if (entry.badge != null) {
 			fmt.push('%s');
 			args.push(entry.badge);
 		}
 
-		if (entry.label !== null) {
+		if (entry.label != null) {
 			fmt.push('%c%s%c ');
 			args.push(style.label + style.base, entry.label, resetFormatStyle(style.label));
 		}
 
-		if (entry.message !== null) {
+		if (entry.message != null) {
 			fmt.push('%c%s ');
 			args.push(style.base, entry.message);
 		}
@@ -164,9 +146,9 @@ export const browserFormat = createFormat(
 			}
 		}
 
-		if (entry.meta !== null) {
+		if (entry.meta != null) {
 			fmt.push('%s');
-			args.push(`${entry.meta.file}:${entry.meta.line}:${entry.meta.column} (${entry.meta.fn})`);
+			args.push(`${entry.meta.file}:${entry.meta.line}:${entry.meta.col}`);
 		}
 
 		args.unshift(fmt.join(''));
